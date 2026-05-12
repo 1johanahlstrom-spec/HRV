@@ -81,9 +81,10 @@ canvas{display:block;width:100%}
   <button id="SB" class="bp" onclick="go()">Starta mätning</button>
   <button class="btn-test" onclick="document.getElementById('TOPTS').classList.toggle('hide')">🧪 Testläge — kör med syntetisk data</button>
   <div id="TOPTS" class="test-opts hide">
-    <div class="test-opt" onclick="runTest(20)">RMSSD 20<br><span style="font-size:8px;color:#ff6b35">Hög stress</span></div>
-    <div class="test-opt" onclick="runTest(50)">RMSSD 50<br><span style="font-size:8px;color:#ffd60a">Normal</span></div>
-    <div class="test-opt" onclick="runTest(80)">RMSSD 80<br><span style="font-size:8px;color:#00f082">Avslappnad</span></div>
+    <div class="test-opt" onclick="runTest(20)">RMSSD ~20<br><span style="font-size:8px;color:#ff6b35">Stokastisk</span></div>
+    <div class="test-opt" onclick="runTest(50)">RMSSD ~50<br><span style="font-size:8px;color:#ffd60a">Stokastisk</span></div>
+    <div class="test-opt" onclick="runTest(80)">RMSSD ~80<br><span style="font-size:8px;color:#00f082">Stokastisk</span></div>
+    <div class="test-opt" onclick="runDetTest()" style="border-color:#a078ff40">RMSSD 50.0<br><span style="font-size:8px;color:#a078ff">Deterministisk</span></div>
   </div>
 </div>
 
@@ -563,8 +564,92 @@ function runTest(targetRMSSD) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// RESULTS
+// DETERMINISTIC TEST — exact, verifiable R-R series
 // ═══════════════════════════════════════════════════════════════
+// Generates R-R intervals where RMSSD is mathematically exact.
+//
+// Method: alternating pattern 800+d, 800-d, 800+d, 800-d...
+// All successive diffs = 2d → RMSSD = sqrt(mean((2d)²)) = 2d
+// For RMSSD=50: d=25 → intervals alternate 825, 775
+//
+// Expected exact results (before outlier filter):
+//   RMSSD  = 50.0 ms
+//   SDNN   = 25.0 ms
+//   meanRR = 800.0 ms
+//   BPM    = 75.0
+//   pNN50  = 0% (diffs are exactly 50, not >50)
+//
+function runDetTest() {
+  const d = 25;       // half-amplitude → RMSSD = 2*d = 50
+  const meanRR = 800; // → 75 BPM
+  const n = 70;       // enough beats for stable FFT
+
+  // Build deterministic R-R array
+  const detRR = [];
+  for(let i = 0; i < n; i++) {
+    detRR.push(i % 2 === 0 ? meanRR + d : meanRR - d);
+  }
+
+  // Verify analytically before running pipeline
+  // successive diffs: all = -50 or +50, so |diff| = 50 for all
+  // RMSSD = sqrt(mean(50²)) = sqrt(2500) = 50.0 exactly
+  // SDNN: values are 825 and 775, mean=800
+  //   variance = ((825-800)² + (775-800)²) / 2 = 625
+  //   SDNN = sqrt(625) = 25.0 exactly
+  // pNN50: |diff| = 50, NOT > 50, so pNN50 = 0%
+
+  // Run through the SAME pipeline as real measurements
+  rri = detRR;
+  hrv = D.hrv(detRR);
+  freqResult = D.freqHRV(detRR);
+
+  // Generate clean PPG-like display signal
+  flt = [];
+  const fakeFps = 30;
+  fps = fakeFps;
+  for(let i = 0; i < 2100; i++) {
+    const t = i / fakeFps;
+    flt.push(Math.sin(2*Math.PI*1.25*t) * 60); // clean 75 BPM sine
+  }
+  pks = [];
+  for(let i = 12; i < flt.length; i += 24) pks.push(i);
+
+  sqi = 100;
+  sqiHist = [100];
+  t0 = performance.now() - 60000;
+
+  document.getElementById('P0').classList.add('hide');
+  document.getElementById('P1').classList.add('hide');
+
+  // Add verification banner to results
+  const expectedRMSSD = 2 * d;
+  const expectedSDNN = d;
+  const expectedMeanRR = meanRR;
+  const expectedBPM = 60000 / meanRR;
+
+  res();
+
+  // Append verification after results render
+  requestAnimationFrame(() => {
+    const el = document.getElementById('P2');
+    const verifyDiv = document.createElement('div');
+    verifyDiv.style.cssText = 'background:rgba(160,120,255,0.06);border:1px solid rgba(160,120,255,0.15);border-radius:11px;padding:14px;margin-top:-4px;font-size:10px;line-height:1.7;color:#b8a8e8';
+    verifyDiv.innerHTML = `<div style="font-weight:700;font-size:11px;margin-bottom:6px;color:#a078ff">🔬 Deterministisk verifiering</div>
+      <div style="font-size:9px;color:#6a6a80;margin-bottom:8px">R-R-serien alternerar exakt ${meanRR+d} ↔ ${meanRR-d} ms (${n} slag). Alla successiva differenser = ±${2*d} ms.</div>
+      <table style="width:100%;border-collapse:collapse;font-size:10px">
+        <tr style="border-bottom:1px solid #ffffff08"><td style="padding:3px 4px;color:#8a8f98">Mått</td><td style="padding:3px 4px;color:#8a8f98">Förväntat</td><td style="padding:3px 4px;color:#8a8f98">Uppmätt</td><td style="padding:3px 4px;color:#8a8f98">Diff</td></tr>
+        <tr><td style="padding:3px 4px;color:#a0a5ae">RMSSD</td><td style="padding:3px 4px">${expectedRMSSD}.0 ms</td><td style="padding:3px 4px">${hrv.rmssd} ms</td><td style="padding:3px 4px;color:${hrv.rmssd===expectedRMSSD?'#00f082':'#ff2d55'}">${hrv.rmssd===expectedRMSSD?'✅ Exakt':'❌ '+Math.abs(hrv.rmssd-expectedRMSSD)+' ms'}</td></tr>
+        <tr><td style="padding:3px 4px;color:#a0a5ae">SDNN</td><td style="padding:3px 4px">${expectedSDNN}.0 ms</td><td style="padding:3px 4px">${hrv.sdnn} ms</td><td style="padding:3px 4px;color:${hrv.sdnn===expectedSDNN?'#00f082':'#ff2d55'}">${hrv.sdnn===expectedSDNN?'✅ Exakt':'❌ '+Math.abs(hrv.sdnn-expectedSDNN)+' ms'}</td></tr>
+        <tr><td style="padding:3px 4px;color:#a0a5ae">Medel RR</td><td style="padding:3px 4px">${expectedMeanRR}.0 ms</td><td style="padding:3px 4px">${hrv.meanRR} ms</td><td style="padding:3px 4px;color:${hrv.meanRR===expectedMeanRR?'#00f082':'#ff2d55'}">${hrv.meanRR===expectedMeanRR?'✅ Exakt':'❌ '+Math.abs(hrv.meanRR-expectedMeanRR)+' ms'}</td></tr>
+        <tr><td style="padding:3px 4px;color:#a0a5ae">BPM</td><td style="padding:3px 4px">${expectedBPM}</td><td style="padding:3px 4px">${hrv.bpm}</td><td style="padding:3px 4px;color:${hrv.bpm===expectedBPM?'#00f082':'#ff2d55'}">${hrv.bpm===expectedBPM?'✅ Exakt':'❌ '+Math.abs(hrv.bpm-expectedBPM)}</td></tr>
+        <tr><td style="padding:3px 4px;color:#a0a5ae">pNN50</td><td style="padding:3px 4px">0%</td><td style="padding:3px 4px">${hrv.pnn50}%</td><td style="padding:3px 4px;color:${hrv.pnn50===0?'#00f082':'#ff2d55'}">${hrv.pnn50===0?'✅ Exakt':'❌'}</td></tr>
+      </table>
+      <div style="margin-top:8px;font-size:8px;color:#5a5a70">pNN50 = 0% eftersom |diff| = 50 ms, och filtret kräver strikt > 50 ms.</div>`;
+    // Insert before the last button
+    const lastBtn = el.querySelector('.bp');
+    el.insertBefore(verifyDiv, lastBtn);
+  });
+}
 function res(){
   const el=document.getElementById('P2');el.classList.remove('hide');
   if(!hrv){el.innerHTML='<p style="color:#6a6f78;text-align:center;padding:40px 0;font-size:13px;line-height:1.6">Inte tillräckligt med data.</p><button class="bp" onclick="rst()">Ny mätning</button>';return}
