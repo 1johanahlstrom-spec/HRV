@@ -151,6 +151,28 @@ const D={
       pnn50:Math.round(pn*10)/10,meanRR:Math.round(m*10)/10,count:fl.length,rej:rr.length-fl.length};
   },
 
+  // Poincaré SD1/SD2 analysis
+  poincare(rr){
+    if(rr.length<4)return null;
+    const v=rr.filter(r=>r>300&&r<1500);if(v.length<4)return null;
+    // SD1 = std of (RR[n+1]-RR[n])/√2  → short-term variability
+    // SD2 = std of (RR[n+1]+RR[n])/√2  → long-term variability
+    const d1=[],d2=[];
+    for(let i=0;i<v.length-1;i++){
+      d1.push((v[i+1]-v[i])/Math.SQRT2);
+      d2.push((v[i+1]+v[i])/Math.SQRT2);
+    }
+    const m1=d1.reduce((a,b)=>a+b,0)/d1.length;
+    const m2=d2.reduce((a,b)=>a+b,0)/d2.length;
+    const sd1=Math.sqrt(d1.map(x=>(x-m1)**2).reduce((a,b)=>a+b,0)/d1.length);
+    const sd2=Math.sqrt(d2.map(x=>(x-m2)**2).reduce((a,b)=>a+b,0)/d2.length);
+    const ratio=sd2>0?sd1/sd2:0;
+    // Build x,y pairs for plot: RR[n] vs RR[n+1]
+    const pairs=[];
+    for(let i=0;i<v.length-1;i++)pairs.push([v[i],v[i+1]]);
+    return{sd1:Math.round(sd1*10)/10,sd2:Math.round(sd2*10)/10,ratio:Math.round(ratio*100)/100,pairs};
+  },
+
   // ═══ FFT & FREQUENCY DOMAIN HRV ═══════════════════════════
 
   // Radix-2 FFT (in-place, Cooley-Tukey)
@@ -474,6 +496,87 @@ function drawPSD(id,freq){
   cx.setLineDash([]);
 }
 
+// Poincaré scatter plot: RR[n] vs RR[n+1]
+function drawPoincare(id, poincareData) {
+  const c=document.getElementById(id);if(!c||!poincareData)return;
+  const cx=c.getContext('2d'),w=c.clientWidth,h=c.clientHeight,dp=devicePixelRatio||1;
+  c.width=w*dp;c.height=h*dp;cx.scale(dp,dp);cx.clearRect(0,0,w,h);
+
+  const{pairs,sd1,sd2}=poincareData;
+  if(pairs.length<3)return;
+
+  const pad=28;
+  const allRR=pairs.flat();
+  const minRR=Math.min(...allRR),maxRR=Math.max(...allRR);
+  const range=maxRR-minRR||100;
+  const plotMin=minRR-range*0.1,plotMax=maxRR+range*0.1,plotRange=plotMax-plotMin;
+  const plotW=w-2*pad,plotH=h-2*pad;
+  const tx=v=>pad+(v-plotMin)/plotRange*plotW;
+  const ty=v=>pad+plotH-(v-plotMin)/plotRange*plotH;
+
+  // Grid
+  cx.strokeStyle='rgba(255,255,255,0.04)';cx.lineWidth=0.5;
+  const step=plotRange>300?100:plotRange>150?50:25;
+  const gridStart=Math.ceil(plotMin/step)*step;
+  cx.font='7px system-ui';cx.fillStyle='#33383f';cx.textAlign='center';
+  for(let v=gridStart;v<plotMax;v+=step){
+    cx.beginPath();cx.moveTo(tx(v),pad);cx.lineTo(tx(v),pad+plotH);cx.stroke();
+    cx.beginPath();cx.moveTo(pad,ty(v));cx.lineTo(pad+plotW,ty(v));cx.stroke();
+    cx.fillText(Math.round(v),tx(v),pad+plotH+10);
+  }
+
+  // Identity line (RR[n] = RR[n+1])
+  cx.strokeStyle='rgba(255,255,255,0.08)';cx.lineWidth=1;cx.setLineDash([4,4]);
+  cx.beginPath();cx.moveTo(tx(plotMin),ty(plotMin));cx.lineTo(tx(plotMax),ty(plotMax));cx.stroke();
+  cx.setLineDash([]);
+
+  // SD1/SD2 ellipse
+  const meanX=allRR.reduce((a,b)=>a+b,0)/allRR.length;
+  const centerX=tx(meanX),centerY=ty(meanX);
+  const scaleX=plotW/plotRange,scaleY=plotH/plotRange;
+  // SD1 is perpendicular to identity line (45°), SD2 is along it
+  cx.save();
+  cx.translate(centerX,centerY);
+  cx.rotate(-Math.PI/4);
+  cx.beginPath();
+  cx.ellipse(0,0,sd2*scaleX,sd1*scaleY,0,0,Math.PI*2);
+  cx.strokeStyle='rgba(0,240,130,0.25)';cx.lineWidth=1.5;cx.stroke();
+  cx.fillStyle='rgba(0,240,130,0.03)';cx.fill();
+  cx.restore();
+
+  // SD1 line (short axis)
+  cx.save();cx.translate(centerX,centerY);cx.rotate(-Math.PI/4);
+  cx.strokeStyle='rgba(255,100,140,0.4)';cx.lineWidth=1;cx.setLineDash([3,3]);
+  cx.beginPath();cx.moveTo(0,-sd1*scaleY);cx.lineTo(0,sd1*scaleY);cx.stroke();
+  cx.setLineDash([]);cx.restore();
+
+  // SD2 line (long axis)
+  cx.save();cx.translate(centerX,centerY);cx.rotate(-Math.PI/4);
+  cx.strokeStyle='rgba(100,140,255,0.4)';cx.lineWidth=1;cx.setLineDash([3,3]);
+  cx.beginPath();cx.moveTo(-sd2*scaleX,0);cx.lineTo(sd2*scaleX,0);cx.stroke();
+  cx.setLineDash([]);cx.restore();
+
+  // Data points
+  pairs.forEach(([x,y],i)=>{
+    const alpha=0.3+0.5*(i/pairs.length);
+    cx.beginPath();
+    cx.arc(tx(x),ty(y),2.5,0,Math.PI*2);
+    cx.fillStyle=`rgba(0,240,130,${alpha})`;
+    cx.fill();
+  });
+
+  // Axis labels
+  cx.fillStyle='#4a5060';cx.font='8px system-ui';
+  cx.textAlign='center';cx.fillText('RR(n) ms',pad+plotW/2,h-2);
+  cx.save();cx.translate(8,pad+plotH/2);cx.rotate(-Math.PI/2);
+  cx.textAlign='center';cx.fillText('RR(n+1) ms',0,0);cx.restore();
+
+  // SD labels on plot
+  cx.font='8px system-ui';cx.textAlign='left';
+  cx.fillStyle='rgba(255,100,140,0.7)';cx.fillText('SD1='+sd1,centerX+4,centerY-sd1*scaleY*0.5-4);
+  cx.fillStyle='rgba(100,140,255,0.7)';cx.fillText('SD2='+sd2,centerX+sd2*scaleX*0.3+4,centerY+12);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // REFERENCE DATA
 // ═══════════════════════════════════════════════════════════════
@@ -508,7 +611,9 @@ function refPanel(hrvData, frData) {
   if(frData){
     html+=`<tr><td style="color:#648cff">LF</td><td>0.04–0.15 Hz. Blandning av sympatisk + parasympatisk. Påverkas av baroreflex</td></tr>
       <tr><td style="color:#00f082">HF</td><td>0.15–0.4 Hz. Huvudsakligen parasympatisk (vagus). Synkroniseras med andning</td></tr>
-      <tr><td style="color:#a078ff">LF/HF</td><td>Sympatovagal balans. Vila ≈ 0.5–2. Under stress/träning: 4–10+. Lägre = mer avslappnad</td></tr>`;
+      <tr><td style="color:#a078ff">LF/HF</td><td>Sympatovagal balans. Vila ≈ 0.5–2. Under stress/träning: 4–10+. Lägre = mer avslappnad</td></tr>
+      <tr><td style="color:#ff648c">SD1</td><td>Poincaré korttid. ≈ RMSSD/√2. Mäter slag-till-slag-variation (parasympatisk)</td></tr>
+      <tr><td style="color:#648cff">SD2</td><td>Poincaré långtid. Mäter långsammare trender i R-R. Relaterat till SDNN</td></tr>`;
   }
   html+=`</table></div>`;
   return html;
@@ -673,6 +778,7 @@ function res(){
   const s=Math.floor(Math.min((performance.now()-t0)/1e3,DUR));
   const sqiF=sqiHist.length?Math.round(sqiHist.reduce((a,b)=>a+b,0)/sqiHist.length):sqi;
   const fr=freqResult;
+  const pc=D.poincare(rri);
 
   let freqHTML='';
   if(fr){
@@ -692,6 +798,33 @@ function res(){
     freqHTML='<div class="w">Frekvensanalys kräver minst 10 R-R intervall.</div>';
   }
 
+  let poincareHTML='';
+  if(pc){
+    poincareHTML=`
+    <div class="section-label">Poincaré-analys</div>
+    <div class="ch"><div class="chh"><span class="cl">RR(n) vs RR(n+1)</span><span class="cl">SD1/SD2 ellips</span></div><canvas id="RPCR" height="220"></canvas></div>
+    <div class="g3">
+      <div class="rc"><span class="rv" style="color:#ff648c">${pc.sd1}</span><span class="rn">SD1 (ms)</span><span class="rd">Korttidsvariabilitet</span></div>
+      <div class="rc"><span class="rv" style="color:#648cff">${pc.sd2}</span><span class="rn">SD2 (ms)</span><span class="rd">Långtidsvariabilitet</span></div>
+      <div class="rc"><span class="rv" style="color:#b8a8e8">${pc.ratio}</span><span class="rn">SD1/SD2</span><span class="rd">Balans kort/lång</span></div>
+    </div>
+    <div class="ref">
+      <div class="ref-title">Så tolkar du Poincaré-plotten</div>
+      <table class="ref-table">
+        <tr><th>Mönster</th><th>Ellipsens form</th><th>Vad det betyder</th></tr>
+        <tr><td class="good">Vila / avslappnad</td><td>Bred, rund moln</td><td>Hög variabilitet i båda axlarna. SD1 > 30, SD2 > 50. Friskt hjärta med stark vagustonus.</td></tr>
+        <tr><td class="med">Lätt stress</td><td>Smalare, cigarrformad</td><td>Minskad korttidsvariation. SD1 minskar mer än SD2. Sympatisk aktivering.</td></tr>
+        <tr><td class="stress">Hög stress / utmattning</td><td>Tight, liten punkt</td><td>Låg variation i alla riktningar. SD1 < 15, SD2 < 30. Begränsad autonom flexibilitet.</td></tr>
+        <tr><td style="color:#a078ff">Brusig data</td><td>Utspridd, kaotisk</td><td>Punkterna saknar struktur. Ofta rörelseartefakter eller dålig signalkvalitet.</td></tr>
+      </table>
+      <div style="margin-top:8px;font-size:8px;color:#5a5a70">
+        <b style="color:#ff648c">SD1</b> (röd linje) = variabilitet vinkelrätt mot identitetslinjen ≈ RMSSD/√2 — mäter slag-till-slag-variation (parasympatisk).<br>
+        <b style="color:#648cff">SD2</b> (blå linje) = variabilitet längs identitetslinjen — mäter långsammare trender (sympatisk + parasympatisk).<br>
+        <b>Identitetslinjen</b> (diagonal streckad) = där RR(n) = RR(n+1), dvs inget förändring mellan slag.
+      </div>
+    </div>`;
+  }
+
   el.innerHTML=`<div style="text-align:center;margin-bottom:6px"><div style="font-size:17px;font-weight:700;color:#eef0f4">Mätning klar</div><p style="font-size:9px;color:#33383f">${s}s · ${hrv.count} giltiga RR · ${hrv.rej} förkastade · SQI ${sqiF}/100</p></div>
   <div class="bb"><span class="bn">${hrv.bpm}</span><span class="bu">BPM</span></div>
 
@@ -699,6 +832,8 @@ function res(){
   <div class="g2"><div class="rc"><span class="rv">${hrv.rmssd}</span><span class="rn">RMSSD (ms)</span><span class="rd">Parasympatisk tonus</span></div><div class="rc"><span class="rv">${hrv.sdnn}</span><span class="rn">SDNN (ms)</span><span class="rd">Total variabilitet</span></div><div class="rc"><span class="rv">${hrv.pnn50}%</span><span class="rn">pNN50</span><span class="rd">Andel ΔRR > 50 ms</span></div><div class="rc"><span class="rv">${hrv.meanRR}</span><span class="rn">Medel RR (ms)</span><span class="rd">Genomsnittligt intervall</span></div></div>
 
   ${freqHTML}
+
+  ${poincareHTML}
 
   ${refPanel(hrv, fr)}
 
@@ -712,6 +847,7 @@ function res(){
   requestAnimationFrame(()=>{
     dw('RW',flt,pks);dr('RV',rri);
     if(fr)drawPSD('RPSD',fr);
+    if(pc)drawPoincare('RPCR',pc);
   });
 }
 function rst(){if(stm){stm.getTracks().forEach(t=>t.stop());stm=null}document.getElementById('P0').classList.remove('hide');document.getElementById('P1').classList.add('hide');document.getElementById('P2').classList.add('hide');const b=document.getElementById('SB');b.disabled=false;b.textContent='Starta mätning'}
