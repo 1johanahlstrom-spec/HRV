@@ -94,6 +94,7 @@ canvas{display:block;width:100%}
   <div class="sr">
     <div id="fc" class="chip" style="background:#ff2d550d;color:#ff2d55;border:1px solid #ff2d551f"><span id="fd" class="dt" style="background:#ff2d55;box-shadow:0 0 5px #ff2d5580"></span><span id="ft">Placera finger</span></div>
     <div id="sc" class="chip" style="background:#5550d;color:#555;border:1px solid #5551f">SQI: <span id="st2">—</span></div>
+    <div class="chip" style="background:#ffd60a0d;border:1px solid #ffd60a1f"><span id="TORCH" style="font-size:10px;color:#ffd60a">Lampa: …</span></div>
   </div>
   <div class="pb"><div id="PG" class="pf"></div></div>
   <div class="tr"><span id="EL">0s</span><span>60s</span></div>
@@ -307,10 +308,26 @@ async function go(){
   fps=se.frameRate||30;co=D.bp4(fps,.5,4);
   try{const cp=tk.getCapabilities?.();const ad=[];if(cp?.exposureMode)ad.push({exposureMode:'manual'});if(cp?.whiteBalanceMode)ad.push({whiteBalanceMode:'manual'});if(ad.length)try{await tk.applyConstraints({advanced:ad})}catch(e){}}catch(e){}
   const v=document.getElementById('V');v.srcObject=stm;await v.play();
+
+  // Auto-enable torch with multiple attempts
+  let torchOk=false;
+  for(let attempt=0;attempt<3&&!torchOk;attempt++){
+    if(attempt>0)await new Promise(r=>setTimeout(r,500));
+    try{
+      const cp=tk.getCapabilities?.();
+      if(cp?.torch){
+        await tk.applyConstraints({advanced:[{torch:true}]});
+        torchOk=true;
+      }
+    }catch(e){}
+  }
+
   t0=performance.now();
   document.getElementById('P0').classList.add('hide');document.getElementById('P1').classList.remove('hide');document.getElementById('P2').classList.add('hide');
   document.getElementById('BM').textContent='—';document.getElementById('RS').classList.add('hide');document.getElementById('MM').classList.add('hide');
   document.getElementById('SETTLE').classList.remove('hide');
+  document.getElementById('TORCH').textContent=torchOk?'Lampa: Auto ✓':'Lampa: Manuell';
+  document.getElementById('TORCH').style.color=torchOk?'#00f082':'#ffd60a';
   raf=requestAnimationFrame(tick);
 }
 function stop(){if(raf){cancelAnimationFrame(raf);raf=null}if(stm){stm.getTracks().forEach(t=>t.stop());stm=null}document.getElementById('P1').classList.add('hide');
