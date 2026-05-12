@@ -110,6 +110,23 @@ canvas{display:block;width:100%}
   <div class="pb"><div id="PG" class="pf"></div></div>
   <div class="tr"><span id="EL">0s</span><span>60s</span></div>
   <div class="bb"><span id="BM" class="bn">—</span><span class="bu">BPM</span></div>
+
+  <!-- Inline breathing guide (collapsible) -->
+  <button id="MBTN" class="btn-breath" style="padding:10px;font-size:11px" onclick="toggleMeasureBreath()">🫁 Visa andningsguide</button>
+  <div id="MBREATH" class="hide">
+    <div class="breath-opts" style="margin-bottom:8px">
+      <div id="mo1" class="breath-opt active" onclick="setMeasureBreathPattern(0)"><b>Resonans</b><br>5.5/min</div>
+      <div id="mo2" class="breath-opt" onclick="setMeasureBreathPattern(1)"><b>4-7-8</b><br>Lugn</div>
+      <div id="mo3" class="breath-opt" onclick="setMeasureBreathPattern(2)"><b>Box</b><br>4×4</div>
+    </div>
+    <div class="breath-ring" style="margin-bottom:8px">
+      <div id="MCIRC" class="breath-circle" style="width:60px;height:60px;background:rgba(0,180,216,0.15);border:2px solid rgba(0,180,216,0.4)">
+        <span id="MLAB" class="breath-label" style="font-size:15px">Redo</span>
+        <span id="MSUB" class="breath-sub"></span>
+      </div>
+    </div>
+  </div>
+
   <div class="ch"><div class="chh"><span class="cl">PPG (filtrerad)</span><span class="cl">Butterworth 4:e ordn.</span></div><canvas id="W" height="120"></canvas></div>
   <div id="RS" class="ch hide"><div class="chh"><span class="cl">R-R intervall</span><span id="RC" class="cl"></span></div><canvas id="RRC" height="65"></canvas></div>
   <div id="MM" class="mr hide">
@@ -365,6 +382,7 @@ let stm=null,raf=null,t0=0,fps=30,co=null;
 let raw=[],rawG=[],ts=[];
 let flt=[],pks=[],rri=[];
 let hrv=null,freqResult=null,sqi=0,sqiHist=[];
+let measureBreathOn=false, measureBreathIdx=0;
 const DUR=60,SETTLE=3;
 
 // ═══════════════════════════════════════════════════════════════
@@ -465,6 +483,8 @@ function tick(){
   const el=Math.min(elapsed,DUR);
   document.getElementById('PG').style.width=(el/DUR*100)+'%';
   document.getElementById('EL').textContent=Math.floor(el)+'s';
+  // Animate inline breathing guide if active
+  if(measureBreathOn)animateBreathCircle(elapsed,measureBreathIdx,'MCIRC','MLAB','MSUB');
   if(elapsed>=DUR){stop();return}
   raf=requestAnimationFrame(tick);
 }
@@ -473,10 +493,54 @@ function tick(){
 // BREATHING GUIDE
 // ═══════════════════════════════════════════════════════════════
 const BREATH_PATTERNS=[
-  {name:'Resonans',id:'bo1',phases:[{t:5.45,l:'Andas in',act:'in'},{t:5.45,l:'Andas ut',act:'out'}]}, // 5.5/min
-  {name:'4-7-8',id:'bo2',phases:[{t:4,l:'Andas in',act:'in'},{t:7,l:'Håll',act:'hold'},{t:8,l:'Andas ut',act:'out'}]},
-  {name:'Box',id:'bo3',phases:[{t:4,l:'Andas in',act:'in'},{t:4,l:'Håll',act:'hold'},{t:4,l:'Andas ut',act:'out'},{t:4,l:'Håll',act:'hold'}]}
+  {name:'Resonans',phases:[{t:5.45,l:'Andas in',act:'in'},{t:5.45,l:'Andas ut',act:'out'}]},
+  {name:'4-7-8',phases:[{t:4,l:'Andas in',act:'in'},{t:7,l:'Håll',act:'hold'},{t:8,l:'Andas ut',act:'out'}]},
+  {name:'Box',phases:[{t:4,l:'Andas in',act:'in'},{t:4,l:'Håll',act:'hold'},{t:4,l:'Andas ut',act:'out'},{t:4,l:'Håll',act:'hold'}]}
 ];
+
+function toggleMeasureBreath(){
+  measureBreathOn=!measureBreathOn;
+  document.getElementById('MBREATH').classList.toggle('hide',!measureBreathOn);
+  document.getElementById('MBTN').textContent=measureBreathOn?'🫁 Dölj andningsguide':'🫁 Visa andningsguide';
+}
+function setMeasureBreathPattern(idx){
+  measureBreathIdx=idx;
+  ['mo1','mo2','mo3'].forEach((id,i)=>document.getElementById(id).classList.toggle('active',i===idx));
+}
+
+// Animate breathing circle given elapsed time, pattern index, and element IDs
+function animateBreathCircle(elapsed,patIdx,circId,labId,subId){
+  const pat=BREATH_PATTERNS[patIdx];
+  const cycleLen=pat.phases.reduce((a,p)=>a+p.t,0);
+  const inCycle=elapsed%cycleLen;
+  let phaseTime=0, curPhase=pat.phases[0];
+  for(const p of pat.phases){
+    if(inCycle>=phaseTime&&inCycle<phaseTime+p.t){curPhase=p;break}
+    phaseTime+=p.t;
+  }
+  const phaseProgress=(inCycle-phaseTime)/curPhase.t;
+  const remaining=Math.ceil(curPhase.t-(inCycle-phaseTime));
+
+  let size;
+  if(curPhase.act==='in') size=60+110*phaseProgress;
+  else if(curPhase.act==='out') size=170-110*phaseProgress;
+  else{
+    const phIdx=pat.phases.indexOf(curPhase);
+    const prevAct=phIdx>0?pat.phases[phIdx-1].act:pat.phases[pat.phases.length-1].act;
+    size=prevAct==='in'?170:60;
+  }
+
+  const circ=document.getElementById(circId);
+  if(!circ)return;
+  const hue=curPhase.act==='in'?190:curPhase.act==='out'?170:210;
+  const intensity=curPhase.act==='hold'?0.1:0.2;
+  circ.style.width=size+'px';circ.style.height=size+'px';
+  circ.style.background=`rgba(0,${hue},216,${intensity})`;
+  circ.style.border=`2px solid rgba(0,${hue},216,0.5)`;
+  circ.style.transition='width 0.15s ease, height 0.15s ease';
+  document.getElementById(labId).textContent=curPhase.l;
+  document.getElementById(subId).textContent=remaining+'s';
+}
 let breathIdx=0, breathRaf=null, breathStart=0, breathActive=false;
 let breathRRI=[],breathRaw=[],breathRawG=[],breathTS=[];
 
