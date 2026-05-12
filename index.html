@@ -45,6 +45,17 @@ canvas{display:block;width:100%}
 .dr{display:flex;justify-content:space-between;padding:2.5px 0}
 .dk{color:#3e434c}.dv{color:#7a7f88;font-weight:600}
 .section-label{font-size:10px;color:#5a6068;text-transform:uppercase;letter-spacing:.08em;margin:4px 0 -4px 2px}
+.ref{background:#ffffff04;border:1px solid #ffffff0a;border-radius:11px;padding:12px;font-size:9px;line-height:1.6}
+.ref-title{font-size:10px;font-weight:700;color:#8a8f98;margin-bottom:8px}
+.ref-table{width:100%;border-collapse:collapse}
+.ref-table th{text-align:left;color:#5a6068;font-weight:600;padding:3px 4px;border-bottom:1px solid #ffffff08;font-size:8px;text-transform:uppercase;letter-spacing:.05em}
+.ref-table td{padding:3px 4px;color:#7a808a;font-size:9px;border-bottom:1px solid #ffffff04}
+.ref-table td:first-child{color:#a0a5ae;font-weight:600}
+.ref-table .good{color:#00f082}.ref-table .med{color:#ffd60a}.ref-table .high{color:#ff6b35}.ref-table .stress{color:#ff2d55}
+.btn-test{background:#a078ff18;color:#a078ff;border:1px solid #a078ff30;border-radius:11px;padding:12px;font-size:12px;font-weight:600;cursor:pointer;width:100%;font-family:inherit}
+.test-opts{display:flex;gap:6px;flex-wrap:wrap}
+.test-opt{background:#ffffff06;border:1px solid #ffffff0d;border-radius:8px;padding:8px 12px;font-size:11px;color:#8a8f98;cursor:pointer;flex:1;text-align:center;min-width:80px}
+.test-opt:hover{background:#ffffff0d;color:#c8cdd6}
 .hide{display:none!important}
 </style>
 
@@ -68,6 +79,12 @@ canvas{display:block;width:100%}
   </div>
   <div id="ER" class="err hide"></div>
   <button id="SB" class="bp" onclick="go()">Starta mätning</button>
+  <button class="btn-test" onclick="document.getElementById('TOPTS').classList.toggle('hide')">🧪 Testläge — kör med syntetisk data</button>
+  <div id="TOPTS" class="test-opts hide">
+    <div class="test-opt" onclick="runTest(20)">RMSSD 20<br><span style="font-size:8px;color:#ff6b35">Hög stress</span></div>
+    <div class="test-opt" onclick="runTest(50)">RMSSD 50<br><span style="font-size:8px;color:#ffd60a">Normal</span></div>
+    <div class="test-opt" onclick="runTest(80)">RMSSD 80<br><span style="font-size:8px;color:#00f082">Avslappnad</span></div>
+  </div>
 </div>
 
 <!-- MEASURING -->
@@ -440,6 +457,112 @@ function drawPSD(id,freq){
 }
 
 // ═══════════════════════════════════════════════════════════════
+// REFERENCE DATA
+// ═══════════════════════════════════════════════════════════════
+function refPanel(hrvData, frData) {
+  // Rate each metric
+  function rateRMSSD(v){return v>50?'good':v>30?'med':v>20?'high':'stress'}
+  function rateSDNN(v){return v>50?'good':v>30?'med':v>20?'high':'stress'}
+  function ratePNN50(v){return v>20?'good':v>10?'med':v>3?'high':'stress'}
+  function rateLFHF(v){return v<2?'good':v<4?'med':v<6?'high':'stress'}
+  function rateLabel(c){return c==='good'?'Bra':c==='med'?'Normal':c==='high'?'Förhöjd':'Hög stress'}
+
+  let html=`<div class="section-label">Tolkning &amp; referensvärden</div>
+  <div class="ref">
+    <div class="ref-title">Dina värden vs. normalområden (vuxen, vila)</div>
+    <table class="ref-table">
+      <tr><th>Mått</th><th>Ditt</th><th>Vila</th><th>Stress</th><th>Status</th></tr>
+      <tr><td>RMSSD</td><td>${hrvData.rmssd} ms</td><td>40–100 ms</td><td>&lt;20 ms</td><td class="${rateRMSSD(hrvData.rmssd)}">${rateLabel(rateRMSSD(hrvData.rmssd))}</td></tr>
+      <tr><td>SDNN</td><td>${hrvData.sdnn} ms</td><td>50–100 ms</td><td>&lt;20 ms</td><td class="${rateSDNN(hrvData.sdnn)}">${rateLabel(rateSDNN(hrvData.sdnn))}</td></tr>
+      <tr><td>pNN50</td><td>${hrvData.pnn50}%</td><td>15–40%</td><td>&lt;3%</td><td class="${ratePNN50(hrvData.pnn50)}">${rateLabel(ratePNN50(hrvData.pnn50))}</td></tr>`;
+  if(frData){
+    html+=`<tr><td>LF/HF</td><td>${frData.ratio}</td><td>0.5–2.0</td><td>&gt;6</td><td class="${rateLFHF(frData.ratio)}">${rateLabel(rateLFHF(frData.ratio))}</td></tr>`;
+  }
+  html+=`</table></div>
+
+  <div class="ref">
+    <div class="ref-title">Vad mäts?</div>
+    <table class="ref-table">
+      <tr><th>Mått</th><th>Beskrivning</th></tr>
+      <tr><td>RMSSD</td><td>Variation mellan slag. Högt = stark parasympatisk (vagus) tonus = bra återhämtning</td></tr>
+      <tr><td>SDNN</td><td>Total variabilitet. Speglar hela autonoma nervsystemet</td></tr>
+      <tr><td>pNN50</td><td>Andel successive R-R som skiljer &gt;50 ms. Korrelerar med RMSSD</td></tr>`;
+  if(frData){
+    html+=`<tr><td style="color:#648cff">LF</td><td>0.04–0.15 Hz. Blandning av sympatisk + parasympatisk. Påverkas av baroreflex</td></tr>
+      <tr><td style="color:#00f082">HF</td><td>0.15–0.4 Hz. Huvudsakligen parasympatisk (vagus). Synkroniseras med andning</td></tr>
+      <tr><td style="color:#a078ff">LF/HF</td><td>Sympatovagal balans. Vila ≈ 0.5–2. Under stress/träning: 4–10+. Lägre = mer avslappnad</td></tr>`;
+  }
+  html+=`</table></div>`;
+  return html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TEST MODE — synthetic R-R data generator
+// ═══════════════════════════════════════════════════════════════
+function generateTestRR(targetRMSSD=50, meanHR=70, durationSec=60) {
+  // Generate R-R intervals with controlled RMSSD
+  // RMSSD = sqrt(mean(successive_diff²))
+  // If successive diffs ~ N(0, sigma), then RMSSD ≈ sigma
+  const meanRR = 60000 / meanHR;  // ms
+  const sigma = targetRMSSD;       // successive diff std ≈ target RMSSD
+  const n = Math.round(durationSec * meanHR / 60);
+
+  const rrArr = [];
+  let prev = meanRR;
+  for(let i = 0; i < n; i++) {
+    // Generate successive difference with target std
+    // Use Box-Muller for normal distribution
+    const u1 = Math.random(), u2 = Math.random();
+    const z = Math.sqrt(-2*Math.log(u1)) * Math.cos(2*Math.PI*u2);
+    const diff = z * sigma * 0.707; // scale for RMSSD match
+
+    // Add respiratory component (0.25 Hz = 15 breaths/min) for HF power
+    const respPhase = 2*Math.PI*0.25*(i*meanRR/1000);
+    const respComponent = 15 * Math.sin(respPhase); // ±15ms respiratory sinus arrhythmia
+
+    // Add slower Mayer wave (0.1 Hz) for LF power
+    const lfPhase = 2*Math.PI*0.1*(i*meanRR/1000);
+    const lfComponent = 10 * Math.sin(lfPhase) * (targetRMSSD/50); // scale with target
+
+    let rr = meanRR + diff + respComponent + lfComponent;
+    // Clamp to physiological range
+    rr = Math.max(400, Math.min(1400, rr));
+    rrArr.push(Math.round(rr*100)/100);
+    prev = rr;
+  }
+  return rrArr;
+}
+
+function runTest(targetRMSSD) {
+  // Generate synthetic data
+  const testRR = generateTestRR(targetRMSSD, 70, 60);
+
+  // Run through our analysis pipeline
+  rri = testRR;
+  hrv = D.hrv(testRR);
+  freqResult = D.freqHRV(testRR);
+
+  // Generate fake PPG-like signal for display
+  flt = [];
+  const fakeFps = 30;
+  fps = fakeFps;
+  for(let i = 0; i < 1800; i++) {
+    const t = i / fakeFps;
+    flt.push(Math.sin(2*Math.PI*1.17*t) * 50 + (Math.random()-0.5)*10);
+  }
+  pks = [];
+  for(let i = 26; i < flt.length; i += 26) pks.push(i);
+
+  sqi = 85; // simulated
+  sqiHist = [85,85,85];
+  t0 = performance.now() - 60000; // pretend 60s elapsed
+
+  document.getElementById('P0').classList.add('hide');
+  document.getElementById('P1').classList.add('hide');
+  res();
+}
+
+// ═══════════════════════════════════════════════════════════════
 // RESULTS
 // ═══════════════════════════════════════════════════════════════
 function res(){
@@ -474,6 +597,8 @@ function res(){
   <div class="g2"><div class="rc"><span class="rv">${hrv.rmssd}</span><span class="rn">RMSSD (ms)</span><span class="rd">Parasympatisk tonus</span></div><div class="rc"><span class="rv">${hrv.sdnn}</span><span class="rn">SDNN (ms)</span><span class="rd">Total variabilitet</span></div><div class="rc"><span class="rv">${hrv.pnn50}%</span><span class="rn">pNN50</span><span class="rd">Andel ΔRR > 50 ms</span></div><div class="rc"><span class="rv">${hrv.meanRR}</span><span class="rn">Medel RR (ms)</span><span class="rd">Genomsnittligt intervall</span></div></div>
 
   ${freqHTML}
+
+  ${refPanel(hrv, fr)}
 
   <div class="section-label">Signaldata</div>
   <div class="ch"><span class="cl">PPG-signal</span><canvas id="RW" height="100"></canvas></div>
