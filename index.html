@@ -53,6 +53,16 @@ canvas{display:block;width:100%}
 .ref-table td:first-child{color:#a0a5ae;font-weight:600}
 .ref-table .good{color:#00f082}.ref-table .med{color:#ffd60a}.ref-table .high{color:#ff6b35}.ref-table .stress{color:#ff2d55}
 .btn-test{background:#a078ff18;color:#a078ff;border:1px solid #a078ff30;border-radius:11px;padding:12px;font-size:12px;font-weight:600;cursor:pointer;width:100%;font-family:inherit}
+.btn-breath{background:#00b4d818;color:#00b4d8;border:1px solid #00b4d830;border-radius:11px;padding:14px;font-size:13px;font-weight:700;cursor:pointer;width:100%;font-family:inherit}
+.breath-ring{width:180px;height:180px;border-radius:50%;margin:0 auto;position:relative;display:flex;align-items:center;justify-content:center}
+.breath-circle{border-radius:50%;transition:all 0.3s ease;display:flex;align-items:center;justify-content:center;flex-direction:column}
+.breath-label{font-size:18px;font-weight:700;color:#e0e8f0;pointer-events:none}
+.breath-sub{font-size:10px;color:#5a6a7a;margin-top:2px;pointer-events:none}
+.breath-opts{display:flex;gap:6px}
+.breath-opt{flex:1;background:#ffffff06;border:1px solid #ffffff0d;border-radius:8px;padding:8px 6px;font-size:10px;color:#6a7a8a;cursor:pointer;text-align:center;line-height:1.4}
+.breath-opt.active{background:#00b4d815;border-color:#00b4d840;color:#00b4d8}
+.coherence-bar{height:8px;border-radius:4px;background:#ffffff08;overflow:hidden;margin-top:4px}
+.coherence-fill{height:100%;border-radius:4px;transition:width 1s ease,background .5s}
 .test-opts{display:flex;gap:6px;flex-wrap:wrap}
 .test-opt{background:#ffffff06;border:1px solid #ffffff0d;border-radius:8px;padding:8px 12px;font-size:11px;color:#8a8f98;cursor:pointer;flex:1;text-align:center;min-width:80px}
 .test-opt:hover{background:#ffffff0d;color:#c8cdd6}
@@ -79,6 +89,7 @@ canvas{display:block;width:100%}
   </div>
   <div id="ER" class="err hide"></div>
   <button id="SB" class="bp" onclick="go()">Starta mätning</button>
+  <button class="btn-breath" onclick="startBreathing()">🫁 Andningsguide med HRV-koherens</button>
   <button class="btn-test" onclick="document.getElementById('TOPTS').classList.toggle('hide')">🧪 Testläge — kör med syntetisk data</button>
   <div id="TOPTS" class="test-opts hide">
     <div class="test-opt" onclick="runTest(20)">RMSSD ~20<br><span style="font-size:8px;color:#ff6b35">Stokastisk</span></div>
@@ -111,6 +122,51 @@ canvas{display:block;width:100%}
 
 <!-- RESULTS -->
 <div id="P2" class="sec hide"></div>
+
+<!-- BREATHING GUIDE -->
+<div id="P3" class="sec hide">
+  <div class="breath-opts">
+    <div id="bo1" class="breath-opt active" onclick="setBreathPattern(0)"><b>Resonans</b><br>5.5/min</div>
+    <div id="bo2" class="breath-opt" onclick="setBreathPattern(1)"><b>4-7-8</b><br>Lugn</div>
+    <div id="bo3" class="breath-opt" onclick="setBreathPattern(2)"><b>Box</b><br>4×4</div>
+  </div>
+
+  <div class="breath-ring">
+    <div id="BCIRC" class="breath-circle" style="width:60px;height:60px;background:rgba(0,180,216,0.15);border:2px solid rgba(0,180,216,0.4)">
+      <span id="BLAB" class="breath-label">Redo</span>
+      <span id="BSUB" class="breath-sub"></span>
+    </div>
+  </div>
+
+  <div class="sr" style="justify-content:center">
+    <div id="bfc" class="chip" style="background:#ff2d550d;color:#ff2d55;border:1px solid #ff2d551f"><span id="bfd" class="dt" style="background:#ff2d55"></span><span id="bft">Placera finger</span></div>
+  </div>
+
+  <div style="text-align:center;padding:4px 0">
+    <span id="BBPM" class="bn" style="font-size:38px">—</span><span class="bu">BPM</span>
+  </div>
+
+  <div class="card" style="padding:10px 14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-size:10px;color:#5a6a7a;text-transform:uppercase;letter-spacing:.05em">Koherens</span>
+      <span id="BCOH" style="font-size:14px;font-weight:700;color:#555">—</span>
+    </div>
+    <div class="coherence-bar"><div id="BCOF" class="coherence-fill" style="width:0;background:#555"></div></div>
+    <div style="display:flex;justify-content:space-between;margin-top:3px;font-size:7px;color:#3a3f48">
+      <span>Låg</span><span>Medium</span><span>Hög</span>
+    </div>
+  </div>
+
+  <div class="mr">
+    <div class="mc"><span id="bxR" class="mv" style="font-size:14px">—</span><span class="ml">RMSSD</span></div>
+    <div class="mc"><span id="bxS" class="mv" style="font-size:14px">—</span><span class="ml">SDNN</span></div>
+    <div class="mc"><span id="bxT" class="mv" style="font-size:14px">0s</span><span class="ml">Tid</span></div>
+  </div>
+
+  <div class="ch"><div class="chh"><span class="cl">PPG (realtid)</span></div><canvas id="BW" height="80"></canvas></div>
+
+  <button class="bd" onclick="stopBreathing()">Avsluta andningsguide</button>
+</div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -411,6 +467,193 @@ function tick(){
   document.getElementById('EL').textContent=Math.floor(el)+'s';
   if(elapsed>=DUR){stop();return}
   raf=requestAnimationFrame(tick);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BREATHING GUIDE
+// ═══════════════════════════════════════════════════════════════
+const BREATH_PATTERNS=[
+  {name:'Resonans',id:'bo1',phases:[{t:5.45,l:'Andas in',act:'in'},{t:5.45,l:'Andas ut',act:'out'}]}, // 5.5/min
+  {name:'4-7-8',id:'bo2',phases:[{t:4,l:'Andas in',act:'in'},{t:7,l:'Håll',act:'hold'},{t:8,l:'Andas ut',act:'out'}]},
+  {name:'Box',id:'bo3',phases:[{t:4,l:'Andas in',act:'in'},{t:4,l:'Håll',act:'hold'},{t:4,l:'Andas ut',act:'out'},{t:4,l:'Håll',act:'hold'}]}
+];
+let breathIdx=0, breathRaf=null, breathStart=0, breathActive=false;
+let breathRRI=[],breathRaw=[],breathRawG=[],breathTS=[];
+
+function setBreathPattern(idx){
+  breathIdx=idx;
+  BREATH_PATTERNS.forEach((p,i)=>{
+    document.getElementById(p.id).classList.toggle('active',i===idx);
+  });
+}
+
+async function startBreathing(){
+  // Start camera (reuse same logic)
+  const er=document.getElementById('ER');er.classList.add('hide');
+  breathRRI=[];breathRaw=[];breathRawG=[];breathTS=[];
+
+  if(!navigator.mediaDevices?.getUserMedia)return;
+  const cfgs=[{facingMode:'environment',width:{ideal:160},height:{ideal:120},frameRate:{ideal:60,min:30}},{facingMode:'environment'},{facingMode:{ideal:'environment'}},true];
+  for(let i=0;i<cfgs.length;i++){
+    try{stm=await navigator.mediaDevices.getUserMedia({video:cfgs[i]});break}
+    catch(e){if(e.name==='NotAllowedError'||i===cfgs.length-1)return}
+  }
+  const tk=stm.getVideoTracks()[0],se=tk.getSettings();
+  fps=se.frameRate||30;co=D.bp4(fps,.5,4);
+  try{const cp=tk.getCapabilities?.();
+    if(cp?.torch)try{await tk.applyConstraints({advanced:[{torch:true}]})}catch(e){}
+    const ad=[];if(cp?.exposureMode)ad.push({exposureMode:'manual'});if(cp?.whiteBalanceMode)ad.push({whiteBalanceMode:'manual'});
+    if(ad.length)try{await tk.applyConstraints({advanced:ad})}catch(e){}
+  }catch(e){}
+  const v=document.getElementById('V');v.srcObject=stm;await v.play();
+
+  breathStart=performance.now();breathActive=true;
+  document.getElementById('P0').classList.add('hide');
+  document.getElementById('P1').classList.add('hide');
+  document.getElementById('P2').classList.add('hide');
+  document.getElementById('P3').classList.remove('hide');
+  breathRaf=requestAnimationFrame(breathTick);
+}
+
+function stopBreathing(){
+  breathActive=false;
+  if(breathRaf){cancelAnimationFrame(breathRaf);breathRaf=null}
+  if(stm){stm.getTracks().forEach(t=>t.stop());stm=null}
+  document.getElementById('P3').classList.add('hide');
+
+  // Run final analysis and show results
+  if(breathRRI.length>=10){
+    rri=breathRRI;
+    hrv=D.hrv(breathRRI);
+    freqResult=D.freqHRV(breathRRI);
+    flt=breathFlt||[];pks=breathPks||[];
+    sqi=breathSqi||50;sqiHist=[sqi];
+    t0=breathStart;
+    res();
+  }else{
+    document.getElementById('P0').classList.remove('hide');
+  }
+}
+
+let breathFlt=[],breathPks=[],breathSqi=0;
+
+function breathTick(){
+  if(!breathActive||!stm)return;
+  const now=performance.now();
+  const elapsed=(now-breathStart)/1000;
+
+  // ── Breathing animation ──
+  const pat=BREATH_PATTERNS[breathIdx];
+  const cycleLen=pat.phases.reduce((a,p)=>a+p.t,0);
+  const inCycle=elapsed%cycleLen;
+  let phaseTime=0, curPhase=pat.phases[0];
+  for(const p of pat.phases){
+    if(inCycle>=phaseTime&&inCycle<phaseTime+p.t){curPhase=p;break}
+    phaseTime+=p.t;
+  }
+  const phaseProgress=(inCycle-phaseTime)/curPhase.t;
+  const remaining=Math.ceil(curPhase.t-(inCycle-phaseTime));
+
+  // Circle size: 60px min, 170px max
+  let size;
+  if(curPhase.act==='in') size=60+110*phaseProgress;
+  else if(curPhase.act==='out') size=170-110*phaseProgress;
+  else size=curPhase.act==='hold'?(inCycle<cycleLen/2?170:60):60; // hold at current size
+
+  // More accurate hold size: depends on previous phase
+  if(curPhase.act==='hold'){
+    const phIdx=pat.phases.indexOf(curPhase);
+    const prevAct=phIdx>0?pat.phases[phIdx-1].act:pat.phases[pat.phases.length-1].act;
+    size=prevAct==='in'?170:60;
+  }
+
+  const circ=document.getElementById('BCIRC');
+  const hue=curPhase.act==='in'?190:curPhase.act==='out'?170:210;
+  const intensity=curPhase.act==='hold'?0.1:0.2;
+  circ.style.width=size+'px';circ.style.height=size+'px';
+  circ.style.background=`rgba(0,${hue},216,${intensity})`;
+  circ.style.border=`2px solid rgba(0,${hue},216,0.5)`;
+  circ.style.transition='width 0.15s ease, height 0.15s ease';
+  document.getElementById('BLAB').textContent=curPhase.l;
+  document.getElementById('BSUB').textContent=remaining+'s';
+
+  // ── Camera PPG processing (same as main tick) ──
+  const v=document.getElementById('V'),cv=document.getElementById('C');
+  if(v&&cv&&stm){
+    const cx=cv.getContext('2d',{willReadFrequently:true});cv.width=32;cv.height=24;cx.drawImage(v,0,0,32,24);
+    const px=cx.getImageData(4,4,24,16).data;
+    let rS=0,gS=0,bS=0,n=0;
+    for(let i=0;i<px.length;i+=4){rS+=px[i];gS+=px[i+1];bS+=px[i+2];n++}
+    const rA=rS/n,gA=gS/n,bA=bS/n,ok=rA>100&&rA>bA*1.3&&rA>gA*1.05;
+
+    // Finger indicator
+    const bfc=document.getElementById('bfc');
+    if(ok){bfc.style.cssText='display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:7px;font-size:10px;font-weight:600;background:#00f0820d;color:#00f082;border:1px solid #00f0821f';
+      document.getElementById('bfd').style.background='#00f082';document.getElementById('bft').textContent='Finger OK';
+    }else{bfc.style.cssText='display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:7px;font-size:10px;font-weight:600;background:#ff2d550d;color:#ff2d55;border:1px solid #ff2d551f';
+      document.getElementById('bfd').style.background='#ff2d55';document.getElementById('bft').textContent='Placera finger';
+    }
+
+    if(ok&&elapsed>2){
+      breathRaw.push(rA);breathRawG.push(gA);breathTS.push(now);
+      if(breathRaw.length>5000){breathRaw=breathRaw.slice(-3600);breathRawG=breathRawG.slice(-3600);breathTS=breathTS.slice(-3600)}
+
+      if(breathTS.length>60){const l=breathTS.slice(-60);fps=1e3/((l[l.length-1]-l[0])/(l.length-1));co=D.bp4(fps,.5,4)}
+
+      if(breathRaw.length>fps*2){
+        const combined=new Float64Array(breathRaw.length);
+        for(let i=0;i<breathRaw.length;i++)combined[i]=breathRaw[i]*.4+breathRawG[i]*.6;
+        breathFlt=Array.from(D.ff(combined,co));
+        breathPks=D.fp(breathFlt,Math.round(fps*.35),.25);
+        breathSqi=D.sq(breathFlt,breathPks,fps);
+        dw('BW',breathFlt,breathPks);
+
+        if(breathPks.length>=3){
+          const pt=breathPks.map(idx=>{const ri=D.rp(breathFlt,idx),fl2=Math.floor(ri),fr=ri-fl2;return fl2>=0&&fl2<breathTS.length-1?breathTS[fl2]+fr*(breathTS[fl2+1]-breathTS[fl2]):breathTS[Math.min(idx,breathTS.length-1)]});
+          breathRRI=[];for(let i=1;i<pt.length;i++){const ms=pt[i]-pt[i-1];if(ms>300&&ms<1500)breathRRI.push(Math.round(ms*100)/100)}
+
+          if(breathRRI.length>=2){
+            const rc=breathRRI.slice(-8);
+            document.getElementById('BBPM').textContent=Math.round(6e4/(rc.reduce((a,b)=>a+b,0)/rc.length));
+          }
+
+          const bhrv=D.hrv(breathRRI);
+          if(bhrv){
+            document.getElementById('bxR').textContent=bhrv.rmssd;
+            document.getElementById('bxS').textContent=bhrv.sdnn;
+          }
+
+          // Coherence: how much HRV power is at breathing frequency
+          if(breathRRI.length>=10){
+            const breathFreq=1/cycleLen; // Hz
+            const fhr=D.freqHRV(breathRRI);
+            if(fhr){
+              // Calculate power in narrow band around breathing freq (±0.03 Hz)
+              let breathPower=0,totalPower=0;
+              const bw=0.03;
+              for(let i=0;i<fhr.nFreqs;i++){
+                const f=fhr.freqs[i];
+                if(f>=0.003&&f<=0.4){
+                  totalPower+=fhr.psd[i];
+                  if(f>=breathFreq-bw&&f<=breathFreq+bw)breathPower+=fhr.psd[i];
+                }
+              }
+              const coherence=totalPower>0?Math.min(100,Math.round(breathPower/totalPower*300)):0;
+              const cohColor=coherence>70?'#00f082':coherence>40?'#ffd60a':coherence>20?'#ff6b35':'#ff2d55';
+              const cohLabel=coherence>70?'Hög':coherence>40?'Medium':coherence>20?'Låg':'Mycket låg';
+              document.getElementById('BCOH').textContent=cohLabel+' '+coherence;
+              document.getElementById('BCOH').style.color=cohColor;
+              document.getElementById('BCOF').style.width=coherence+'%';
+              document.getElementById('BCOF').style.background=cohColor;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  document.getElementById('bxT').textContent=Math.floor(elapsed)+'s';
+  breathRaf=requestAnimationFrame(breathTick);
 }
 
 // ═══════════════════════════════════════════════════════════════
