@@ -1,0 +1,491 @@
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08090c;color:#c8cdd6;font-family:system-ui,sans-serif;font-size:13px;padding:14px;max-width:420px;margin:0 auto;min-height:100vh;-webkit-user-select:none;user-select:none}
+video,.hcv{display:none}
+.hdr{display:flex;align-items:center;gap:10px;border-bottom:1px solid #ffffff0a;padding-bottom:12px;margin-bottom:14px}
+.logo{width:34px;height:34px;border-radius:8px;background:#00f0820d;border:1px solid #00f0821a;display:flex;align-items:center;justify-content:center}
+h1{font-size:15px;color:#eef0f4;font-weight:700}
+.sub{font-size:9px;color:#3e434c;text-transform:uppercase;letter-spacing:.04em;margin-top:1px}
+.sec{display:flex;flex-direction:column;gap:10px}
+.card{background:#ffffff04;border:1px solid #ffffff0a;border-radius:14px;padding:18px 16px}
+.ct{font-size:13px;font-weight:600;color:#a0a5ae;text-align:center;margin-bottom:12px}
+.st{display:flex;align-items:center;gap:9px;font-size:11px;color:#6a6f78;margin-bottom:6px}
+.sn{width:20px;height:20px;border-radius:50%;background:#00f08212;color:#00f082;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.bp{background:linear-gradient(135deg,#00f082,#00c86a);color:#080a0c;border:none;border-radius:11px;padding:15px;font-size:14px;font-weight:700;cursor:pointer;width:100%;font-family:inherit}
+.bp:disabled{opacity:.5}
+.bd{background:#ff2d5512;color:#ff2d55;border:1px solid #ff2d5530;border-radius:11px;padding:13px;font-size:13px;font-weight:600;cursor:pointer;width:100%;font-family:inherit}
+.err{padding:14px;border-radius:10px;background:#ff3c3c0f;border:1px solid #ff3c3c26;font-size:11px;color:#e0a0a0;line-height:1.6}
+.sr{display:flex;gap:7px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:7px;font-size:10px;font-weight:600}
+.dt{width:5px;height:5px;border-radius:50%}
+.pb{height:3px;background:#ffffff08;border-radius:2px;overflow:hidden}
+.pf{height:100%;background:linear-gradient(90deg,#00f082,#00c86a);border-radius:2px;transition:width .3s;width:0}
+.tr{display:flex;justify-content:space-between;font-size:9px;color:#33383f}
+.bb{text-align:center;padding:6px 0}
+.bn{font-size:48px;font-weight:800;color:#00f082;text-shadow:0 0 20px #00f08240;letter-spacing:-.03em;line-height:1}
+.bu{display:block;font-size:10px;color:#3e434c;text-transform:uppercase;letter-spacing:.1em;margin-top:2px}
+.ch{background:#00000033;border:1px solid #00f0820d;border-radius:9px;padding:7px 9px;overflow:hidden}
+.cl{font-size:8px;color:#333a3f;text-transform:uppercase;letter-spacing:.07em}
+.chh{display:flex;justify-content:space-between;margin-bottom:3px}
+canvas{display:block;width:100%}
+.mr{display:flex;gap:5px}
+.mc{flex:1;background:#ffffff03;border:1px solid #ffffff09;border-radius:9px;padding:9px 5px;text-align:center}
+.mv{display:block;font-size:16px;font-weight:700;color:#dde0e6}
+.ml{display:block;font-size:7.5px;color:#3e434c;text-transform:uppercase;letter-spacing:.1em;margin-top:1.5px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.rc{background:#ffffff04;border:1px solid #ffffff0a;border-radius:11px;padding:12px 8px;text-align:center}
+.rv{display:block;font-size:22px;font-weight:700;color:#dde0e6;line-height:1.1}
+.rn{display:block;font-size:9px;color:#6a6f78;margin-top:3px;font-weight:600}
+.rd{display:block;font-size:7.5px;color:#33383f;margin-top:1.5px}
+.w{font-size:9px;color:#4a4f55;background:#ffd60a05;border:1px solid #ffd60a0f;border-radius:7px;padding:7px 10px;line-height:1.5}
+.settle{text-align:center;padding:12px;font-size:12px;color:#ffd60a;background:#ffd60a0a;border:1px solid #ffd60a18;border-radius:9px}
+.dg{background:#ffffff04;border:1px solid #ffffff0a;border-radius:9px;padding:8px 12px;font-size:9px}
+.dr{display:flex;justify-content:space-between;padding:2.5px 0}
+.dk{color:#3e434c}.dv{color:#7a7f88;font-weight:600}
+.section-label{font-size:10px;color:#5a6068;text-transform:uppercase;letter-spacing:.08em;margin:4px 0 -4px 2px}
+.hide{display:none!important}
+</style>
+
+<video id="V" playsinline muted></video>
+<canvas id="C" class="hcv"></canvas>
+
+<div class="hdr">
+  <div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3.5 12h2l1.5-3 2 6 2-8 2 7 1.5-4 1.5 2h4" stroke="#00f082" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <div style="flex:1"><h1>HRV Monitor <span style="font-size:9px;color:#00f082;vertical-align:super">v4</span></h1><div class="sub">Tids- &amp; frekvensdomän · LF/HF</div></div>
+</div>
+
+<!-- IDLE -->
+<div id="P0" class="sec">
+  <div class="card">
+    <div style="text-align:center;margin-bottom:14px"><svg width="48" height="48" viewBox="0 0 100 100"><defs><radialGradient id="rg" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ff2d55" stop-opacity=".3"/><stop offset="100%" stop-color="#ff2d55" stop-opacity="0"/></radialGradient></defs><circle cx="50" cy="50" r="38" fill="url(#rg)"/><ellipse cx="50" cy="44" rx="15" ry="21" fill="none" stroke="#ff2d55" stroke-width="1.5" opacity=".6"/><circle cx="50" cy="40" r="4" fill="#ff2d55" opacity=".5"><animate attributeName="r" values="3;6;3" dur="1.4s" repeatCount="indefinite"/></circle></svg></div>
+    <div class="ct">Så funkar det</div>
+    <div class="st"><span class="sn">1</span><b>Tänd ficklampan:</b> svep ner från toppen → tryck 🔦</div>
+    <div class="st"><span class="sn">2</span>Tryck "Starta mätning" nedan</div>
+    <div class="st"><span class="sn">3</span>Lägg pekfingret lätt över kameran + lampan</div>
+    <div class="st"><span class="sn">4</span>Vila handen på ett bord — håll stilla i 60 sek</div>
+  </div>
+  <div id="ER" class="err hide"></div>
+  <button id="SB" class="bp" onclick="go()">Starta mätning</button>
+</div>
+
+<!-- MEASURING -->
+<div id="P1" class="sec hide">
+  <div id="SETTLE" class="settle hide">⏳ Signalen stabiliseras… håll stilla</div>
+  <div class="sr">
+    <div id="fc" class="chip" style="background:#ff2d550d;color:#ff2d55;border:1px solid #ff2d551f"><span id="fd" class="dt" style="background:#ff2d55;box-shadow:0 0 5px #ff2d5580"></span><span id="ft">Placera finger</span></div>
+    <div id="sc" class="chip" style="background:#5550d;color:#555;border:1px solid #5551f">SQI: <span id="st2">—</span></div>
+  </div>
+  <div class="pb"><div id="PG" class="pf"></div></div>
+  <div class="tr"><span id="EL">0s</span><span>60s</span></div>
+  <div class="bb"><span id="BM" class="bn">—</span><span class="bu">BPM</span></div>
+  <div class="ch"><div class="chh"><span class="cl">PPG (filtrerad)</span><span class="cl">Butterworth 4:e ordn.</span></div><canvas id="W" height="120"></canvas></div>
+  <div id="RS" class="ch hide"><div class="chh"><span class="cl">R-R intervall</span><span id="RC" class="cl"></span></div><canvas id="RRC" height="65"></canvas></div>
+  <div id="MM" class="mr hide">
+    <div class="mc"><span id="xR" class="mv">—</span><span class="ml">RMSSD</span></div>
+    <div class="mc"><span id="xS" class="mv">—</span><span class="ml">SDNN</span></div>
+    <div class="mc"><span id="xP" class="mv">—</span><span class="ml">pNN50</span></div>
+  </div>
+  <button class="bd" onclick="stop()">Avsluta → Resultat</button>
+</div>
+
+<!-- RESULTS -->
+<div id="P2" class="sec hide"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DSP ENGINE v4 — with FFT frequency domain analysis
+// ═══════════════════════════════════════════════════════════════
+const D={
+  // Butterworth bandpass
+  bp2(fs,fl,fh){const wL=2*Math.PI*fl/fs,wH=2*Math.PI*fh/fs,wLw=2*fs*Math.tan(wL/2),wHw=2*fs*Math.tan(wH/2),bw=wHw-wLw,w0=Math.sqrt(wLw*wHw),Q=.7071,K=2*fs,K2=K*K,w02=w0*w0,a0=K2+bw*K/Q+w02;return{b:[bw*K/a0,0,-bw*K/a0],a:[1,(2*w02-2*K2)/a0,(K2-bw*K/Q+w02)/a0]}},
+  bp4(fs,fl=.5,fh=4){return[this.bp2(fs,fl,fh),this.bp2(fs,fl,fh)]},
+  af(s,c){const o=new Float64Array(s.length);let z1=0,z2=0;for(let i=0;i<s.length;i++){const x=s[i],y=c.b[0]*x+z1;z1=c.b[1]*x-c.a[1]*y+z2;z2=c.b[2]*x-c.a[2]*y;o[i]=y}return o},
+  ff1(s,c){const p=Math.min(9,s.length-1),pd=new Float64Array(s.length+2*p);for(let i=0;i<p;i++){pd[i]=2*s[0]-s[p-i];pd[s.length+p+i]=2*s[s.length-1]-s[s.length-2-i]}for(let i=0;i<s.length;i++)pd[p+i]=s[i];const f=this.af(pd,c),r=new Float64Array(f.length);for(let i=0;i<f.length;i++)r[i]=f[f.length-1-i];const b=this.af(r,c),o=new Float64Array(s.length);for(let i=0;i<s.length;i++)o[i]=b[b.length-1-p-i];return o},
+  ff(s,secs){let o=s;for(const sec of secs)o=this.ff1(o,sec);return o},
+  rp(d,i){if(i<=0||i>=d.length-1)return i;const dn=2*(2*d[i]-d[i-1]-d[i+1]);return Math.abs(dn)<1e-10?i:i+Math.max(-.5,Math.min(.5,(d[i-1]-d[i+1])/dn))},
+  fp(d,md,th=.25){const pk=[];if(d.length<5)return pk;const s=[...d].sort((a,b)=>a-b),t=s[0|s.length*.1]+(s[0|s.length*.9]-s[0|s.length*.1])*th;for(let i=2;i<d.length-2;i++)if(d[i]>t&&d[i]>=d[i-1]&&d[i]>=d[i+1]&&d[i]>d[i-2]&&d[i]>d[i+2]){if(!pk.length||i-pk[pk.length-1]>=md)pk.push(i);else if(d[i]>d[pk[pk.length-1]])pk[pk.length-1]=i}return pk},
+  // SQI calibrated for camera PPG
+  sq(f,pk,fs){
+    if(pk.length<3)return 0;
+    const ib=[];for(let i=1;i<pk.length;i++)ib.push((pk[i]-pk[i-1])/fs*1e3);
+    const m=ib.reduce((a,b)=>a+b,0)/ib.length,sd=Math.sqrt(ib.map(x=>(x-m)**2).reduce((a,b)=>a+b,0)/ib.length);
+    const rs=Math.max(0,Math.min(40,40*(1-sd/m/.5)));
+    const am=pk.map(i=>f[i]),mA=am.reduce((a,b)=>a+b,0)/am.length,sA=Math.sqrt(am.map(x=>(x-mA)**2).reduce((a,b)=>a+b,0)/am.length);
+    const as=Math.max(0,Math.min(30,30*(1-(mA?sA/Math.abs(mA):1)/.9)));
+    const ab=[...f].map(Math.abs).sort((a,b)=>a-b),n=ab[0|ab.length*.25],sg=ab[0|ab.length*.95],snr=n>0?sg/n:sg>0?15:0;
+    return Math.round(rs+as+Math.max(0,Math.min(30,30*Math.min(1,snr/4))));
+  },
+  // Time-domain HRV
+  hrv(rr){
+    if(rr.length<3)return null;
+    let v=rr.filter(r=>r>300&&r<1500);if(v.length<3)return null;
+    const s=[...v].sort((a,b)=>a-b),md=s[0|s.length/2];
+    const fl=v.filter(r=>Math.abs(r-md)<md*.25);if(fl.length<3)return null;
+    const m=fl.reduce((a,b)=>a+b,0)/fl.length;
+    const sd=Math.sqrt(fl.map(r=>(r-m)**2).reduce((a,b)=>a+b,0)/fl.length);
+    const df=[];for(let i=1;i<fl.length;i++)df.push(fl[i]-fl[i-1]);
+    const rm=Math.sqrt(df.map(d=>d*d).reduce((a,b)=>a+b,0)/df.length);
+    const pn=(df.filter(d=>Math.abs(d)>50).length/df.length)*100;
+    return{bpm:Math.round(6e5/m)/10,sdnn:Math.round(sd*10)/10,rmssd:Math.round(rm*10)/10,
+      pnn50:Math.round(pn*10)/10,meanRR:Math.round(m*10)/10,count:fl.length,rej:rr.length-fl.length};
+  },
+
+  // ═══ FFT & FREQUENCY DOMAIN HRV ═══════════════════════════
+
+  // Radix-2 FFT (in-place, Cooley-Tukey)
+  fft(re,im){
+    const n=re.length;
+    // Bit-reversal permutation
+    for(let i=1,j=0;i<n;i++){
+      let bit=n>>1;
+      while(j&bit){j^=bit;bit>>=1}
+      j^=bit;
+      if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}
+    }
+    // FFT butterflies
+    for(let len=2;len<=n;len<<=1){
+      const ang=2*Math.PI/len;
+      const wRe=Math.cos(ang),wIm=-Math.sin(ang);
+      for(let i=0;i<n;i+=len){
+        let curRe=1,curIm=0;
+        for(let j=0;j<len/2;j++){
+          const uRe=re[i+j],uIm=im[i+j];
+          const vRe=re[i+j+len/2]*curRe-im[i+j+len/2]*curIm;
+          const vIm=re[i+j+len/2]*curIm+im[i+j+len/2]*curRe;
+          re[i+j]=uRe+vRe;im[i+j]=uIm+vIm;
+          re[i+j+len/2]=uRe-vRe;im[i+j+len/2]=uIm-vIm;
+          const newCurRe=curRe*wRe-curIm*wIm;
+          curIm=curRe*wIm+curIm*wRe;curRe=newCurRe;
+        }
+      }
+    }
+  },
+
+  // Cubic interpolation: resample RR intervals to uniform rate
+  resampleRR(rrMs, targetFs=4){
+    if(rrMs.length<4)return null;
+    // Build cumulative time axis (seconds)
+    const tRR=[0];
+    for(let i=0;i<rrMs.length;i++) tRR.push(tRR[tRR.length-1]+rrMs[i]/1000);
+    // RR values at each beat time (use instantaneous RR)
+    const yRR=[rrMs[0]/1000];
+    for(let i=0;i<rrMs.length;i++) yRR.push(rrMs[i]/1000);
+    // Uniform time grid
+    const duration=tRR[tRR.length-1];
+    const nSamples=Math.floor(duration*targetFs);
+    if(nSamples<8)return null;
+    const uniform=new Float64Array(nSamples);
+    for(let i=0;i<nSamples;i++){
+      const t=i/targetFs;
+      // Find interval
+      let k=1;
+      while(k<tRR.length-1&&tRR[k]<t)k++;
+      k=Math.min(k,tRR.length-1);
+      // Linear interpolation (good enough for HRV PSD)
+      const t0=tRR[k-1],t1=tRR[k];
+      const frac=(t1!==t0)?(t-t0)/(t1-t0):0;
+      uniform[i]=yRR[k-1]+(yRR[k]-yRR[k-1])*frac;
+    }
+    return{data:uniform,fs:targetFs,duration};
+  },
+
+  // Hanning window
+  hann(n){const w=new Float64Array(n);for(let i=0;i<n;i++)w[i]=.5*(1-Math.cos(2*Math.PI*i/(n-1)));return w},
+
+  // Compute PSD and frequency-domain HRV metrics
+  freqHRV(rrMs){
+    if(rrMs.length<10)return null;
+    const resamp=this.resampleRR(rrMs,4);
+    if(!resamp)return null;
+    const{data,fs}=resamp;
+
+    // Detrend (remove mean)
+    const mean=data.reduce((a,b)=>a+b,0)/data.length;
+    for(let i=0;i<data.length;i++)data[i]-=mean;
+
+    // Zero-pad to next power of 2
+    let N=1;while(N<data.length)N<<=1;
+    N=Math.max(N,256); // at least 256 points for resolution
+
+    const re=new Float64Array(N),im=new Float64Array(N);
+    const win=this.hann(data.length);
+    // Compute window power for normalization
+    let winPow=0;for(let i=0;i<win.length;i++)winPow+=win[i]*win[i];
+    winPow/=win.length;
+
+    for(let i=0;i<data.length;i++){re[i]=data[i]*win[i]}
+
+    this.fft(re,im);
+
+    // One-sided PSD (ms²/Hz)
+    const nFreqs=N/2+1;
+    const psd=new Float64Array(nFreqs);
+    const freqs=new Float64Array(nFreqs);
+    const df=fs/N;
+    for(let i=0;i<nFreqs;i++){
+      freqs[i]=i*df;
+      let p=(re[i]*re[i]+im[i]*im[i])/(fs*N*winPow);
+      if(i>0&&i<N/2)p*=2; // double for one-sided
+      psd[i]=p*1e6; // convert s² to ms²
+    }
+
+    // Integrate bands
+    // VLF: 0.003–0.04 Hz, LF: 0.04–0.15 Hz, HF: 0.15–0.4 Hz
+    let vlf=0,lf=0,hf=0,tp=0;
+    for(let i=0;i<nFreqs;i++){
+      const f=freqs[i];
+      if(f>=0.003&&f<0.04)vlf+=psd[i]*df;
+      if(f>=0.04&&f<0.15)lf+=psd[i]*df;
+      if(f>=0.15&&f<=0.4)hf+=psd[i]*df;
+      if(f>=0.003&&f<=0.4)tp+=psd[i]*df;
+    }
+
+    const ratio=hf>0?lf/hf:0;
+    // Normalized units (% of LF+HF)
+    const lfhfSum=lf+hf||1;
+    const lfNu=(lf/lfhfSum)*100;
+    const hfNu=(hf/lfhfSum)*100;
+
+    return{
+      lf:Math.round(lf*10)/10,
+      hf:Math.round(hf*10)/10,
+      vlf:Math.round(vlf*10)/10,
+      tp:Math.round(tp*10)/10,
+      ratio:Math.round(ratio*100)/100,
+      lfNu:Math.round(lfNu),
+      hfNu:Math.round(hfNu),
+      psd,freqs,nFreqs
+    };
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let stm=null,raf=null,t0=0,fps=30,co=null;
+let raw=[],rawG=[],ts=[];
+let flt=[],pks=[],rri=[];
+let hrv=null,freqResult=null,sqi=0,sqiHist=[];
+const DUR=60,SETTLE=3;
+
+// ═══════════════════════════════════════════════════════════════
+// CAMERA
+// ═══════════════════════════════════════════════════════════════
+async function go(){
+  const b=document.getElementById('SB'),er=document.getElementById('ER');
+  b.disabled=true;b.textContent='⏳ Startar kameran...';er.classList.add('hide');
+  raw=[];rawG=[];ts=[];flt=[];pks=[];rri=[];hrv=null;freqResult=null;sqi=0;sqiHist=[];
+
+  if(!navigator.mediaDevices?.getUserMedia){er.innerHTML='<b>⚠️</b> Kameran stöds inte.';er.classList.remove('hide');b.disabled=false;b.textContent='Starta mätning';return}
+  const cfgs=[{facingMode:'environment',width:{ideal:160},height:{ideal:120},frameRate:{ideal:60,min:30}},{facingMode:'environment'},{facingMode:{ideal:'environment'}},true];
+  for(let i=0;i<cfgs.length;i++){
+    try{stm=await navigator.mediaDevices.getUserMedia({video:cfgs[i]});break}
+    catch(e){if(e.name==='NotAllowedError'){er.innerHTML='<b>⚠️ Kameratillstånd nekades</b><br><br>Tryck låsikonen → Kamera → Tillåt. Ladda om.';er.classList.remove('hide');b.disabled=false;b.textContent='Starta mätning';return}
+    if(i===cfgs.length-1){er.innerHTML='<b>⚠️</b> '+e.message;er.classList.remove('hide');b.disabled=false;b.textContent='Starta mätning';return}}
+  }
+  const tk=stm.getVideoTracks()[0],se=tk.getSettings();
+  fps=se.frameRate||30;co=D.bp4(fps,.5,4);
+  try{const cp=tk.getCapabilities?.();const ad=[];if(cp?.exposureMode)ad.push({exposureMode:'manual'});if(cp?.whiteBalanceMode)ad.push({whiteBalanceMode:'manual'});if(ad.length)try{await tk.applyConstraints({advanced:ad})}catch(e){}}catch(e){}
+  const v=document.getElementById('V');v.srcObject=stm;await v.play();
+  t0=performance.now();
+  document.getElementById('P0').classList.add('hide');document.getElementById('P1').classList.remove('hide');document.getElementById('P2').classList.add('hide');
+  document.getElementById('BM').textContent='—';document.getElementById('RS').classList.add('hide');document.getElementById('MM').classList.add('hide');
+  document.getElementById('SETTLE').classList.remove('hide');
+  raf=requestAnimationFrame(tick);
+}
+function stop(){if(raf){cancelAnimationFrame(raf);raf=null}if(stm){stm.getTracks().forEach(t=>t.stop());stm=null}document.getElementById('P1').classList.add('hide');
+  // Final frequency analysis
+  if(rri.length>=10)freqResult=D.freqHRV(rri);
+  res();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN LOOP
+// ═══════════════════════════════════════════════════════════════
+function tick(){
+  const v=document.getElementById('V'),cv=document.getElementById('C');
+  if(!v||!cv||!stm)return;
+  const cx=cv.getContext('2d',{willReadFrequently:true});cv.width=32;cv.height=24;cx.drawImage(v,0,0,32,24);
+  const px=cx.getImageData(4,4,24,16).data;
+  let rS=0,gS=0,bS=0,n=0;
+  for(let i=0;i<px.length;i+=4){rS+=px[i];gS+=px[i+1];bS+=px[i+2];n++}
+  const rA=rS/n,gA=gS/n,bA=bS/n,ok=rA>100&&rA>bA*1.3&&rA>gA*1.05;
+
+  const fc=document.getElementById('fc'),fd=document.getElementById('fd'),ft=document.getElementById('ft');
+  if(ok){fc.style.cssText='display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:7px;font-size:10px;font-weight:600;background:#00f0820d;color:#00f082;border:1px solid #00f0821f';fd.style.background='#00f082';fd.style.boxShadow='0 0 5px #00f08280';ft.textContent='Finger OK'}
+  else{fc.style.cssText='display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:7px;font-size:10px;font-weight:600;background:#ff2d550d;color:#ff2d55;border:1px solid #ff2d551f';fd.style.background='#ff2d55';fd.style.boxShadow='0 0 5px #ff2d5580';ft.textContent='Placera finger'}
+
+  const elapsed=(performance.now()-t0)/1e3;
+  const settling=elapsed<SETTLE;
+  if(settling&&ok)document.getElementById('SETTLE').classList.remove('hide');
+  else document.getElementById('SETTLE').classList.add('hide');
+
+  if(ok&&!settling){
+    raw.push(rA);rawG.push(gA);ts.push(performance.now());
+    if(raw.length>5e3){raw=raw.slice(-3600);rawG=rawG.slice(-3600);ts=ts.slice(-3600)}
+    if(ts.length>60){const l=ts.slice(-60);fps=1e3/((l[l.length-1]-l[0])/(l.length-1));co=D.bp4(fps,.5,4)}
+    if(raw.length>fps*2){
+      const combined=new Float64Array(raw.length);
+      for(let i=0;i<raw.length;i++)combined[i]=raw[i]*.4+rawG[i]*.6;
+      flt=Array.from(D.ff(combined,co));
+      pks=D.fp(flt,Math.round(fps*.35),.25);
+      sqi=D.sq(flt,pks,fps);
+      sqiHist.push(sqi);if(sqiHist.length>5)sqiHist.shift();
+      const sqiS=Math.round(sqiHist.reduce((a,b)=>a+b,0)/sqiHist.length);
+      const sl=sqiS>60?'Utmärkt':sqiS>35?'Bra':sqiS>15?'OK':'Svag';
+      const sc2=sqiS>60?'#00f082':sqiS>35?'#ffd60a':sqiS>15?'#ff6b35':'#ff2d55';
+      document.getElementById('sc').style.cssText=`display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:7px;font-size:10px;font-weight:600;background:${sc2}0d;color:${sc2};border:1px solid ${sc2}1f`;
+      document.getElementById('st2').textContent=sl+' '+sqiS;
+      dw('W',flt,pks);
+      if(pks.length>=3){
+        const pt=pks.map(idx=>{const ri=D.rp(flt,idx),fl2=Math.floor(ri),fr=ri-fl2;return fl2>=0&&fl2<ts.length-1?ts[fl2]+fr*(ts[fl2+1]-ts[fl2]):ts[Math.min(idx,ts.length-1)]});
+        rri=[];for(let i=1;i<pt.length;i++){const ms=pt[i]-pt[i-1];if(ms>300&&ms<1500)rri.push(Math.round(ms*100)/100)}
+        if(rri.length>=2){const rc=rri.slice(-8);document.getElementById('BM').textContent=Math.round(6e4/(rc.reduce((a,b)=>a+b,0)/rc.length))}
+        if(rri.length>3){document.getElementById('RS').classList.remove('hide');document.getElementById('RC').textContent=rri.length+' st';dr('RRC',rri)}
+        hrv=D.hrv(rri);
+        if(hrv){document.getElementById('MM').classList.remove('hide');document.getElementById('xR').textContent=hrv.rmssd;document.getElementById('xS').textContent=hrv.sdnn;document.getElementById('xP').textContent=hrv.pnn50+'%'}
+      }
+    }
+  }
+  const el=Math.min(elapsed,DUR);
+  document.getElementById('PG').style.width=(el/DUR*100)+'%';
+  document.getElementById('EL').textContent=Math.floor(el)+'s';
+  if(elapsed>=DUR){stop();return}
+  raf=requestAnimationFrame(tick);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════════════════════
+function dw(id,data,peaks){
+  const c=document.getElementById(id);if(!c||data.length<2)return;
+  const cx=c.getContext('2d'),w=c.clientWidth,h=c.clientHeight,dp=devicePixelRatio||1;
+  c.width=w*dp;c.height=h*dp;cx.scale(dp,dp);cx.clearRect(0,0,w,h);
+  cx.strokeStyle='#00f0820a';cx.lineWidth=.5;
+  for(let y=0;y<h;y+=20){cx.beginPath();cx.moveTo(0,y);cx.lineTo(w,y);cx.stroke()}
+  const vl=Math.min(data.length,w*2),vs=data.slice(-vl),of=data.length-vl,am=Math.max(...vs.map(Math.abs))||1;
+  const tx=i=>(i/(vl-1))*w,ty=v=>h/2-(v/am)*(h*.4);
+  cx.beginPath();vs.forEach((v,i)=>{i?cx.lineTo(tx(i),ty(v)):cx.moveTo(tx(i),ty(v))});
+  cx.lineTo(w,h);cx.lineTo(0,h);cx.closePath();
+  const g=cx.createLinearGradient(0,0,0,h);g.addColorStop(0,'#00f08212');g.addColorStop(1,'#00f08200');cx.fillStyle=g;cx.fill();
+  cx.beginPath();cx.strokeStyle='#00f082';cx.lineWidth=1.8;cx.shadowColor='#00f082';cx.shadowBlur=4;
+  vs.forEach((v,i)=>{i?cx.lineTo(tx(i),ty(v)):cx.moveTo(tx(i),ty(v))});cx.stroke();cx.shadowBlur=0;
+  peaks.forEach(pk=>{const li=Math.round(pk)-of;if(li>=0&&li<vl){const x=tx(li),y=ty(vs[li]);cx.beginPath();cx.arc(x,y,3,0,Math.PI*2);cx.fillStyle='#ff2d55';cx.fill()}});
+}
+function dr(id,iv){
+  const c=document.getElementById(id);if(!c||iv.length<2)return;
+  const cx=c.getContext('2d'),w=c.clientWidth,h=c.clientHeight,dp=devicePixelRatio||1;
+  c.width=w*dp;c.height=h*dp;cx.scale(dp,dp);cx.clearRect(0,0,w,h);
+  const vs=iv.slice(-50),mx=Math.max(...vs),mn=Math.min(...vs),rg=mx-mn||50,me=vs.reduce((a,b)=>a+b,0)/vs.length,bw=Math.max(2,(w-16)/vs.length-1.5);
+  vs.forEach((r,i)=>{const n=(r-mn)/rg,bh=6+n*(h-16),x=8+i*(bw+1.5),dv=Math.abs(r-me)/rg;cx.fillStyle=`hsla(${150-dv*120},80%,55%,.8)`;cx.beginPath();cx.roundRect(x,h-bh,bw,bh,1);cx.fill()});
+}
+
+// PSD spectrum chart
+function drawPSD(id,freq){
+  const c=document.getElementById(id);if(!c||!freq)return;
+  const cx=c.getContext('2d'),w=c.clientWidth,h=c.clientHeight,dp=devicePixelRatio||1;
+  c.width=w*dp;c.height=h*dp;cx.scale(dp,dp);cx.clearRect(0,0,w,h);
+
+  const{psd,freqs,nFreqs}=freq;
+  // Show 0–0.5 Hz range
+  const maxF=0.5, pad=8;
+  const maxIdx=Math.min(nFreqs,Math.ceil(maxF/freqs[1]));
+  let maxPsd=0;
+  for(let i=1;i<maxIdx;i++)if(psd[i]>maxPsd)maxPsd=psd[i];
+  if(maxPsd===0)maxPsd=1;
+
+  const plotW=w-2*pad, plotH=h-2*pad;
+  const tx=f=>pad+(f/maxF)*plotW;
+  const ty=p=>pad+plotH-(p/maxPsd)*plotH;
+
+  // Band backgrounds
+  // VLF: 0.003-0.04 (skip, too small)
+  // LF: 0.04-0.15 — blue
+  cx.fillStyle='rgba(100,140,255,0.08)';
+  cx.fillRect(tx(0.04),pad,tx(0.15)-tx(0.04),plotH);
+  // HF: 0.15-0.4 — green
+  cx.fillStyle='rgba(0,240,130,0.08)';
+  cx.fillRect(tx(0.15),pad,tx(0.4)-tx(0.15),plotH);
+
+  // Band labels
+  cx.font='7px system-ui';cx.textAlign='center';
+  cx.fillStyle='rgba(100,140,255,0.5)';cx.fillText('LF',tx(0.095),h-1);
+  cx.fillStyle='rgba(0,240,130,0.5)';cx.fillText('HF',tx(0.275),h-1);
+
+  // Frequency axis labels
+  cx.fillStyle='#33383f';cx.font='7px system-ui';cx.textAlign='center';
+  [0,0.1,0.2,0.3,0.4,0.5].forEach(f=>{cx.fillText(f.toFixed(1),tx(f),h-pad+12)});
+
+  // PSD curve with fill
+  cx.beginPath();
+  cx.moveTo(tx(freqs[1]),ty(0));
+  for(let i=1;i<maxIdx;i++){cx.lineTo(tx(freqs[i]),ty(psd[i]))}
+  cx.lineTo(tx(freqs[maxIdx-1]),ty(0));
+  cx.closePath();
+  const grd=cx.createLinearGradient(0,pad,0,pad+plotH);
+  grd.addColorStop(0,'rgba(160,120,255,0.2)');grd.addColorStop(1,'rgba(160,120,255,0)');
+  cx.fillStyle=grd;cx.fill();
+
+  // PSD line
+  cx.beginPath();cx.strokeStyle='#a078ff';cx.lineWidth=1.5;cx.shadowColor='#a078ff';cx.shadowBlur=3;
+  for(let i=1;i<maxIdx;i++){i===1?cx.moveTo(tx(freqs[i]),ty(psd[i])):cx.lineTo(tx(freqs[i]),ty(psd[i]))}
+  cx.stroke();cx.shadowBlur=0;
+
+  // Band boundary lines
+  cx.strokeStyle='rgba(255,255,255,0.06)';cx.setLineDash([3,3]);cx.lineWidth=0.5;
+  [0.04,0.15,0.4].forEach(f=>{cx.beginPath();cx.moveTo(tx(f),pad);cx.lineTo(tx(f),pad+plotH);cx.stroke()});
+  cx.setLineDash([]);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RESULTS
+// ═══════════════════════════════════════════════════════════════
+function res(){
+  const el=document.getElementById('P2');el.classList.remove('hide');
+  if(!hrv){el.innerHTML='<p style="color:#6a6f78;text-align:center;padding:40px 0;font-size:13px;line-height:1.6">Inte tillräckligt med data.</p><button class="bp" onclick="rst()">Ny mätning</button>';return}
+  const s=Math.floor(Math.min((performance.now()-t0)/1e3,DUR));
+  const sqiF=sqiHist.length?Math.round(sqiHist.reduce((a,b)=>a+b,0)/sqiHist.length):sqi;
+  const fr=freqResult;
+
+  let freqHTML='';
+  if(fr){
+    freqHTML=`
+    <div class="section-label">Frekvensdomän</div>
+    <div class="ch"><div class="chh"><span class="cl">Power Spectral Density (PSD)</span><span class="cl">Hz</span></div><canvas id="RPSD" height="130"></canvas></div>
+    <div class="g3">
+      <div class="rc"><span class="rv" style="color:#648cff">${fr.lf}</span><span class="rn">LF (ms²)</span><span class="rd">0.04–0.15 Hz</span></div>
+      <div class="rc"><span class="rv" style="color:#00f082">${fr.hf}</span><span class="rn">HF (ms²)</span><span class="rd">0.15–0.4 Hz</span></div>
+      <div class="rc"><span class="rv" style="color:#a078ff">${fr.ratio}</span><span class="rn">LF/HF</span><span class="rd">Sympatovagal balans</span></div>
+    </div>
+    <div class="g2">
+      <div class="rc"><span class="rv" style="font-size:18px">${fr.lfNu}%</span><span class="rn">LF n.u.</span><span class="rd">Normaliserad</span></div>
+      <div class="rc"><span class="rv" style="font-size:18px">${fr.hfNu}%</span><span class="rn">HF n.u.</span><span class="rd">Normaliserad</span></div>
+    </div>`;
+  }else{
+    freqHTML='<div class="w">Frekvensanalys kräver minst 10 R-R intervall.</div>';
+  }
+
+  el.innerHTML=`<div style="text-align:center;margin-bottom:6px"><div style="font-size:17px;font-weight:700;color:#eef0f4">Mätning klar</div><p style="font-size:9px;color:#33383f">${s}s · ${hrv.count} giltiga RR · ${hrv.rej} förkastade · SQI ${sqiF}/100</p></div>
+  <div class="bb"><span class="bn">${hrv.bpm}</span><span class="bu">BPM</span></div>
+
+  <div class="section-label">Tidsdomän</div>
+  <div class="g2"><div class="rc"><span class="rv">${hrv.rmssd}</span><span class="rn">RMSSD (ms)</span><span class="rd">Parasympatisk tonus</span></div><div class="rc"><span class="rv">${hrv.sdnn}</span><span class="rn">SDNN (ms)</span><span class="rd">Total variabilitet</span></div><div class="rc"><span class="rv">${hrv.pnn50}%</span><span class="rn">pNN50</span><span class="rd">Andel ΔRR > 50 ms</span></div><div class="rc"><span class="rv">${hrv.meanRR}</span><span class="rn">Medel RR (ms)</span><span class="rd">Genomsnittligt intervall</span></div></div>
+
+  ${freqHTML}
+
+  <div class="section-label">Signaldata</div>
+  <div class="ch"><span class="cl">PPG-signal</span><canvas id="RW" height="100"></canvas></div>
+  <div class="ch"><span class="cl">R-R intervallserie</span><canvas id="RV" height="70"></canvas></div>
+  <div class="dg"><div class="dr"><span class="dk">FPS</span><span class="dv">${Math.round(fps*10)/10}</span></div><div class="dr"><span class="dk">Filter</span><span class="dv">Butterworth 4:e ordn.</span></div><div class="dr"><span class="dk">Kanaler</span><span class="dv">R 40% + G 60%</span></div><div class="dr"><span class="dk">SQI</span><span class="dv">${sqiF}/100</span></div></div>
+  <div class="w">⚠️ Demo — ersätter inte medicinsk utrustning. LF/HF-tolkning kräver standardiserade mätförhållanden.</div>
+  <button class="bp" onclick="rst()">Ny mätning</button>`;
+
+  requestAnimationFrame(()=>{
+    dw('RW',flt,pks);dr('RV',rri);
+    if(fr)drawPSD('RPSD',fr);
+  });
+}
+function rst(){if(stm){stm.getTracks().forEach(t=>t.stop());stm=null}document.getElementById('P0').classList.remove('hide');document.getElementById('P1').classList.add('hide');document.getElementById('P2').classList.add('hide');const b=document.getElementById('SB');b.disabled=false;b.textContent='Starta mätning'}
+</script>
