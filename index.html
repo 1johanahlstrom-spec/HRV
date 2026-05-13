@@ -88,7 +88,7 @@ canvas{display:block;width:100%}
   <div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3.5 12h2l1.5-3 2 6 2-8 2 7 1.5-4 1.5 2h4" stroke="#00f082" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
   <div style="flex:1"><h1>HRV Monitor <span style="font-size:9px;color:#00f082;vertical-align:super">v5.1</span></h1><div class="sub">Tids- &amp; frekvensdomän · LF/HF · Andning</div></div>
 </div>
-<div style="text-align:right;font-size:9px;color:#5a6068;margin-top:-10px;margin-bottom:6px" id="BVER">Build 2026-05-13d</div>
+<div style="text-align:right;font-size:9px;color:#5a6068;margin-top:-10px;margin-bottom:6px" id="BVER">Build 2026-05-13e</div>
 
 <!-- IDLE -->
 <div id="P0" class="sec">
@@ -728,6 +728,34 @@ function dbClear(){
   if(confirm('Radera all historik?')){localStorage.removeItem(DB_KEY);renderHistory()}
 }
 
+function exportCSV(){
+  const entries=dbLoad();
+  if(!entries.length){alert('Ingen data att exportera.');return}
+  const headers=['Datum','Tid','Morgon','RMSSD (ms)','SDNN (ms)','BPM','pNN50 (%)','Medel RR (ms)','LF (ms²)','HF (ms²)','LF/HF','SQI','Längd (s)','R-R antal'];
+  const rows=entries.map(e=>[
+    e.date,
+    e.time,
+    e.hour>=6&&e.hour<=9?'Ja':'Nej',
+    e.rmssd,
+    e.sdnn,
+    e.bpm,
+    e.pnn50,
+    e.meanRR,
+    e.lf!=null?e.lf:'',
+    e.hf!=null?e.hf:'',
+    e.lfhf!=null?e.lfhf:'',
+    e.sqi,
+    e.dur,
+    e.count
+  ]);
+  const csv='\uFEFF'+[headers,...rows].map(r=>r.join(';')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='hrv-historik-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();URL.revokeObjectURL(url);
+}
+
 function saveMeasurement(hrvData,frData,sqiVal,durSec){
   if(!hrvData)return;
   const now=new Date();
@@ -762,7 +790,7 @@ function renderHistory(){
   }
 
   const recent=entries.slice(-7).reverse();
-  let html=`<div class="hist-title"><span>📊 Senaste mätningar</span><button class="hist-clear" onclick="dbClear()">Rensa</button></div>`;
+  let html=`<div class="hist-title"><span>📊 Senaste mätningar</span><div><button class="hist-clear" style="color:#00b4d8;margin-right:8px" onclick="exportCSV()">📥 Exportera</button><button class="hist-clear" onclick="dbClear()">Rensa</button></div></div>`;
   recent.forEach(e=>{
     const isMorning=e.hour>=6&&e.hour<=9;
     html+=`<div class="hist-row">
