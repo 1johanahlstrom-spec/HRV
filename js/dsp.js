@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// DSP ENGINE v5 — Enhanced signal processing pipeline
+// DSP ENGINE v5.4 — Enhanced signal processing pipeline
 //
 // Improvements over v4:
 // 1. Detrending (moving-average baseline removal)
