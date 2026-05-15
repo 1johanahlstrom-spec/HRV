@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// DRAWING — PPG waveform, RR bars, PSD, Poincaré, Trend
+// DRAWING — PPG waveform, RR bars, PSD, Poincaré, Trend 
 // ═══════════════════════════════════════════════════════════════
 
 export function drawWaveform(id, data, peaks) {
@@ -66,8 +66,8 @@ export function drawPoincare(id, pd) {
   c.width = w * dp; c.height = h * dp; cx.scale(dp, dp); cx.clearRect(0, 0, w, h);
   const { pairs, sd1, sd2 } = pd; if (pairs.length < 3) return;
   const pad = 28, allRR = pairs.flat();
-  const minRR = Math.min(...allRR), maxRR = Math.max(...allRR), range = maxRR - minRR || 100;
-  const plotMin = minRR - range * 0.1, plotMax = maxRR + range * 0.1, plotRange = plotMax - plotMin;
+  // Fixed axis range: 400–1200ms (covers 50–150 BPM)
+  const plotMin = 400, plotMax = 1200, plotRange = plotMax - plotMin;
   const plotW = w - 2 * pad, plotH = h - 2 * pad;
   const tx = v => pad + (v - plotMin) / plotRange * plotW, ty = v => pad + plotH - (v - plotMin) / plotRange * plotH;
 
