@@ -44,7 +44,7 @@ export const D = {
     const dn = 2 * (2 * d[i] - d[i - 1] - d[i + 1]);
     return Math.abs(dn) < 1e-10 ? i : i + Math.max(-.5, Math.min(.5, (d[i - 1] - d[i + 1]) / dn));
   },
-  fp(d, md, th = .25) {
+  fp(d, md, th = .35) {
     const pk = []; if (d.length < 5) return pk;
     const s = [...d].sort((a, b) => a - b);
     const t = s[0 | s.length * .1] + (s[0 | s.length * .9] - s[0 | s.length * .1]) * th;
@@ -74,16 +74,20 @@ export const D = {
   // ── Time-domain HRV ────────────────────────────────────────
   hrv(rr) {
     if (rr.length < 3) return null;
-    let v = rr.filter(r => r > 300 && r < 1500); if (v.length < 3) return null;
+    // Physiological bounds: 40–180 BPM → 333–1500 ms
+    let v = rr.filter(r => r > 333 && r < 1500); if (v.length < 3) return null;
     const s = [...v].sort((a, b) => a - b), md = s[0 | s.length / 2];
-    const fl = v.filter(r => Math.abs(r - md) < md * .25); if (fl.length < 3) return null;
+    // Reject outliers: keep only within ±20% of median
+    const fl = v.filter(r => Math.abs(r - md) < md * .20); if (fl.length < 3) return null;
     const m = fl.reduce((a, b) => a + b, 0) / fl.length;
+    // Use median for BPM (robust against remaining outliers)
+    const sfl = [...fl].sort((a, b) => a - b), medRR = sfl[0 | sfl.length / 2];
     const sd = Math.sqrt(fl.map(r => (r - m) ** 2).reduce((a, b) => a + b, 0) / fl.length);
     const df = []; for (let i = 1; i < fl.length; i++) df.push(fl[i] - fl[i - 1]);
     const rm = Math.sqrt(df.map(d => d * d).reduce((a, b) => a + b, 0) / df.length);
     const pn = (df.filter(d => Math.abs(d) > 50).length / df.length) * 100;
     return {
-      bpm: Math.round(6e5 / m) / 10, sdnn: Math.round(sd * 10) / 10, rmssd: Math.round(rm * 10) / 10,
+      bpm: Math.round(6e5 / medRR) / 10, sdnn: Math.round(sd * 10) / 10, rmssd: Math.round(rm * 10) / 10,
       pnn50: Math.round(pn * 10) / 10, meanRR: Math.round(m * 10) / 10, count: fl.length, rej: rr.length - fl.length
     };
   },

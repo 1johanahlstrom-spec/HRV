@@ -123,7 +123,7 @@ function tick() {
       const combined = new Float64Array(raw.length);
       for (let i = 0; i < raw.length; i++) combined[i] = raw[i] * .4 + rawG[i] * .6;
       flt = Array.from(D.ff(combined, co));
-      pks = D.fp(flt, Math.round(fps * .35), .25);
+      pks = D.fp(flt, Math.round(fps * .45));
       sqi = D.sq(flt, pks, fps);
       sqiHist.push(sqi); if (sqiHist.length > 5) sqiHist.shift();
       const sqiS = Math.round(sqiHist.reduce((a, b) => a + b, 0) / sqiHist.length);
@@ -134,8 +134,8 @@ function tick() {
       drawWaveform('W', flt, pks);
       if (pks.length >= 3) {
         const pt = pks.map(idx => { const ri = D.rp(flt, idx), fl2 = Math.floor(ri), fr = ri - fl2; return fl2 >= 0 && fl2 < ts.length - 1 ? ts[fl2] + fr * (ts[fl2 + 1] - ts[fl2]) : ts[Math.min(idx, ts.length - 1)]; });
-        rri = []; for (let i = 1; i < pt.length; i++) { const ms = pt[i] - pt[i - 1]; if (ms > 300 && ms < 1500) rri.push(Math.round(ms * 100) / 100); }
-        if (rri.length >= 2) { const rc = rri.slice(-8); document.getElementById('BM').textContent = Math.round(6e4 / (rc.reduce((a, b) => a + b, 0) / rc.length)); }
+        rri = []; for (let i = 1; i < pt.length; i++) { const ms = pt[i] - pt[i - 1]; if (ms > 333 && ms < 1500) rri.push(Math.round(ms * 100) / 100); }
+        if (rri.length >= 2) { const rc = rri.slice(-12); const srt = [...rc].sort((a,b) => a - b); const med = srt[0 | srt.length / 2]; document.getElementById('BM').textContent = Math.round(6e4 / med); }
         if (rri.length > 3) { document.getElementById('RS').classList.remove('hide'); document.getElementById('RC').textContent = rri.length + ' st'; drawRR('RRC', rri); }
         hrv = D.hrv(rri);
         if (hrv) { document.getElementById('MM').classList.remove('hide'); document.getElementById('xR').textContent = hrv.rmssd; document.getElementById('xS').textContent = hrv.sdnn; document.getElementById('xP').textContent = hrv.pnn50 + '%'; }

@@ -136,7 +136,7 @@ function breathTick(resCallback) {
         const combined = new Float64Array(breathRaw.length);
         for (let i = 0; i < breathRaw.length; i++) combined[i] = breathRaw[i] * .4 + breathRawG[i] * .6;
         breathFlt = Array.from(D.ff(combined, coRef));
-        breathPks = D.fp(breathFlt, Math.round(fpsRef * .35), .25);
+        breathPks = D.fp(breathFlt, Math.round(fpsRef * .45));
         breathSqi = D.sq(breathFlt, breathPks, fpsRef);
         drawWaveform('BW', breathFlt, breathPks);
 
@@ -146,11 +146,11 @@ function breathTick(resCallback) {
             return fl2 >= 0 && fl2 < breathTS.length - 1 ? breathTS[fl2] + fr * (breathTS[fl2 + 1] - breathTS[fl2]) : breathTS[Math.min(idx, breathTS.length - 1)];
           });
           breathRRI = [];
-          for (let i = 1; i < pt.length; i++) { const ms = pt[i] - pt[i - 1]; if (ms > 300 && ms < 1500) breathRRI.push(Math.round(ms * 100) / 100); }
+          for (let i = 1; i < pt.length; i++) { const ms = pt[i] - pt[i - 1]; if (ms > 333 && ms < 1500) breathRRI.push(Math.round(ms * 100) / 100); }
 
           if (breathRRI.length >= 2) {
-            const rc = breathRRI.slice(-8);
-            document.getElementById('BBPM').textContent = Math.round(6e4 / (rc.reduce((a, b) => a + b, 0) / rc.length));
+            const rc = breathRRI.slice(-12); const srt = [...rc].sort((a,b) => a - b); const med = srt[0 | srt.length / 2];
+            document.getElementById('BBPM').textContent = Math.round(6e4 / med);
           }
           const bhrv = D.hrv(breathRRI);
           if (bhrv) { document.getElementById('bxR').textContent = bhrv.rmssd; document.getElementById('bxS').textContent = bhrv.sdnn; }
