@@ -9,9 +9,10 @@ import { BREATH_PATTERNS, animateBreathCircle, setBreathPattern, startBreathing,
 
 // ── State ────────────────────────────────────────────────────
 let stm = null, raf = null, t0 = 0, fps = 30, co = null;
-let raw = [], rawG = [], ts = [];
+let raw = [], rawG = [], rawB = [], ts = [];
 let flt = [], pks = [], rri = [];
 let hrv = null, freqResult = null, sqi = 0, sqiHist = [];
+let motionClean = null, sqiResult = null;
 let measureBreathOn = false, measureBreathIdx = 0;
 const DUR = 60, SETTLE = 3;
 
@@ -51,8 +52,8 @@ function setMeasureBreathPattern(idx) {
 async function go() {
   const b = document.getElementById('SB'), er = document.getElementById('ER');
   b.disabled = true; b.textContent = '⏳ Startar kameran...'; er.classList.add('hide');
-  raw = []; rawG = []; ts = []; flt = []; pks = []; rri = [];
-  hrv = null; freqResult = null; sqi = 0; sqiHist = [];
+  raw = []; rawG = []; rawB = []; ts = []; flt = []; pks = []; rri = [];
+  hrv = null; freqResult = null; sqi = 0; sqiHist = []; motionClean = null; sqiResult = null;
 
   if (!navigator.mediaDevices?.getUserMedia) { er.innerHTML = '<b>⚠️</b> Kameran stöds inte.'; er.classList.remove('hide'); b.disabled = false; b.textContent = 'Starta mätning'; return; }
   const cfgs = [{ facingMode: 'environment', width: { ideal: 160 }, height: { ideal: 120 }, frameRate: { ideal: 60, min: 30 } }, { facingMode: 'environment' }, { facingMode: { ideal: 'environment' } }, true];
@@ -116,15 +117,24 @@ function tick() {
   else document.getElementById('SETTLE').classList.add('hide');
 
   if (ok && !settling) {
-    raw.push(rA); rawG.push(gA); ts.push(performance.now());
-    if (raw.length > 5e3) { raw = raw.slice(-3600); rawG = rawG.slice(-3600); ts = ts.slice(-3600); }
+    raw.push(rA); rawG.push(gA); rawB.push(bA); ts.push(performance.now());
+    if (raw.length > 5e3) { raw = raw.slice(-3600); rawG = rawG.slice(-3600); rawB = rawB.slice(-3600); ts = ts.slice(-3600); }
     if (ts.length > 60) { const l = ts.slice(-60); fps = 1e3 / ((l[l.length - 1] - l[0]) / (l.length - 1)); co = D.bp4(fps, .5, 4); }
     if (raw.length > fps * 2) {
+      // Combine channels
       const combined = new Float64Array(raw.length);
       for (let i = 0; i < raw.length; i++) combined[i] = raw[i] * .4 + rawG[i] * .6;
-      flt = Array.from(D.ff(combined, co));
+      // Detrend (remove slow drift with 2s window)
+      const detrended = D.detrend(combined, 2, fps);
+      // Bandpass filter
+      flt = Array.from(D.ff(detrended, co));
+      // Motion detection via blue channel
+      motionClean = D.detectMotion(rawB, fps, 0.5);
+      // Adaptive peak detection
       pks = D.fp(flt, Math.round(fps * .45));
-      sqi = D.sq(flt, pks, fps);
+      // SQI with per-peak quality
+      sqiResult = D.sq(flt, pks, fps);
+      sqi = sqiResult.score;
       sqiHist.push(sqi); if (sqiHist.length > 5) sqiHist.shift();
       const sqiS = Math.round(sqiHist.reduce((a, b) => a + b, 0) / sqiHist.length);
       const sl = sqiS > 60 ? 'Utmärkt' : sqiS > 35 ? 'Bra' : sqiS > 15 ? 'OK' : 'Svag';
@@ -133,8 +143,8 @@ function tick() {
       document.getElementById('st2').textContent = sl + ' ' + sqiS;
       drawWaveform('W', flt, pks);
       if (pks.length >= 3) {
-        const pt = pks.map(idx => { const ri = D.rp(flt, idx), fl2 = Math.floor(ri), fr = ri - fl2; return fl2 >= 0 && fl2 < ts.length - 1 ? ts[fl2] + fr * (ts[fl2 + 1] - ts[fl2]) : ts[Math.min(idx, ts.length - 1)]; });
-        rri = []; for (let i = 1; i < pt.length; i++) { const ms = pt[i] - pt[i - 1]; if (ms > 333 && ms < 1500) rri.push(Math.round(ms * 100) / 100); }
+        // SQI-gated R-R extraction (skips bad peaks + motion segments)
+        rri = D.extractRRI(flt, pks, ts, sqiResult, motionClean);
         if (rri.length >= 2) { const rc = rri.slice(-12); const srt = [...rc].sort((a,b) => a - b); const med = srt[0 | srt.length / 2]; document.getElementById('BM').textContent = Math.round(6e4 / med); }
         if (rri.length > 3) { document.getElementById('RS').classList.remove('hide'); document.getElementById('RC').textContent = rri.length + ' st'; drawRR('RRC', rri); }
         hrv = D.hrv(rri);

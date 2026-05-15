@@ -1,8 +1,16 @@
 // ═══════════════════════════════════════════════════════════════
-// DSP ENGINE v4 — Butterworth, FFT, HRV, Poincaré, SQI
+// DSP ENGINE v5 — Enhanced signal processing pipeline
+//
+// Improvements over v4:
+// 1. Detrending (moving-average baseline removal)
+// 2. Adaptive peak threshold (tracks recent peak amplitudes)
+// 3. Blue-channel motion artifact detection
+// 4. SQI-gated R-R extraction
+// 5. Welch's method for PSD estimation
 // ═══════════════════════════════════════════════════════════════
 
 export const D = {
+
   // ── Butterworth bandpass ───────────────────────────────────
   bp2(fs, fl, fh) {
     const wL = 2 * Math.PI * fl / fs, wH = 2 * Math.PI * fh / fs;
@@ -38,27 +46,77 @@ export const D = {
   },
   ff(s, secs) { let o = s; for (const sec of secs) o = this.ff1(o, sec); return o; },
 
-  // ── Peak detection & refinement ────────────────────────────
+  // ═══ NEW: Detrending — remove slow baseline drift ═════════
+  detrend(s, windowSec, fs) {
+    const w = Math.max(3, Math.round(windowSec * fs)) | 1;
+    const half = (w - 1) / 2;
+    const out = new Float64Array(s.length);
+    for (let i = 0; i < s.length; i++) {
+      const left = Math.max(0, i - half), right = Math.min(s.length - 1, i + half);
+      let sum = 0; for (let j = left; j <= right; j++) sum += s[j];
+      out[i] = s[i] - sum / (right - left + 1);
+    }
+    return out;
+  },
+
+  // ═══ NEW: Blue-channel motion artifact detection ══════════
+  // Returns boolean array: true = clean, false = motion
+  detectMotion(blueChannel, fs, windowSec = 0.5) {
+    const w = Math.max(3, Math.round(windowSec * fs));
+    const n = blueChannel.length;
+    const clean = new Array(n).fill(true);
+    if (n < w * 2) return clean;
+    const vars = [];
+    for (let i = 0; i <= n - w; i++) {
+      let sum = 0, sum2 = 0;
+      for (let j = i; j < i + w; j++) { sum += blueChannel[j]; sum2 += blueChannel[j] * blueChannel[j]; }
+      vars.push(sum2 / w - (sum / w) ** 2);
+    }
+    if (vars.length < 3) return clean;
+    const sv = [...vars].sort((a, b) => a - b);
+    const threshold = sv[0 | sv.length / 2] * 3;
+    for (let i = 0; i < vars.length; i++) {
+      if (vars[i] > threshold) {
+        for (let j = i; j < Math.min(i + w, n); j++) clean[j] = false;
+      }
+    }
+    return clean;
+  },
+
+  // ═══ IMPROVED: Adaptive peak detection ════════════════════
   rp(d, i) {
     if (i <= 0 || i >= d.length - 1) return i;
     const dn = 2 * (2 * d[i] - d[i - 1] - d[i + 1]);
     return Math.abs(dn) < 1e-10 ? i : i + Math.max(-.5, Math.min(.5, (d[i - 1] - d[i + 1]) / dn));
   },
+
   fp(d, md, th = .35) {
     const pk = []; if (d.length < 5) return pk;
     const s = [...d].sort((a, b) => a - b);
-    const t = s[0 | s.length * .1] + (s[0 | s.length * .9] - s[0 | s.length * .1]) * th;
-    for (let i = 2; i < d.length - 2; i++)
-      if (d[i] > t && d[i] >= d[i - 1] && d[i] >= d[i + 1] && d[i] > d[i - 2] && d[i] > d[i + 2]) {
-        if (!pk.length || i - pk[pk.length - 1] >= md) pk.push(i);
-        else if (d[i] > d[pk[pk.length - 1]]) pk[pk.length - 1] = i;
+    let t = s[0 | s.length * .1] + (s[0 | s.length * .9] - s[0 | s.length * .1]) * th;
+    const recentAmps = [];
+    for (let i = 2; i < d.length - 2; i++) {
+      if (recentAmps.length >= 3) {
+        const avgAmp = recentAmps.reduce((a, b) => a + b, 0) / recentAmps.length;
+        t = avgAmp * 0.4;
       }
+      if (d[i] > t && d[i] >= d[i - 1] && d[i] >= d[i + 1] && d[i] > d[i - 2] && d[i] > d[i + 2]) {
+        if (!pk.length || i - pk[pk.length - 1] >= md) {
+          pk.push(i);
+          recentAmps.push(d[i]);
+          if (recentAmps.length > 8) recentAmps.shift();
+        } else if (d[i] > d[pk[pk.length - 1]]) {
+          recentAmps[recentAmps.length - 1] = d[i];
+          pk[pk.length - 1] = i;
+        }
+      }
+    }
     return pk;
   },
 
-  // ── SQI (calibrated for camera PPG) ────────────────────────
+  // ═══ IMPROVED: SQI with per-peak quality flags ════════════
   sq(f, pk, fs) {
-    if (pk.length < 3) return 0;
+    if (pk.length < 3) return { score: 0, peakOk: [] };
     const ib = []; for (let i = 1; i < pk.length; i++) ib.push((pk[i] - pk[i - 1]) / fs * 1e3);
     const m = ib.reduce((a, b) => a + b, 0) / ib.length;
     const sd = Math.sqrt(ib.map(x => (x - m) ** 2).reduce((a, b) => a + b, 0) / ib.length);
@@ -68,18 +126,37 @@ export const D = {
     const as = Math.max(0, Math.min(30, 30 * (1 - (mA ? sA / Math.abs(mA) : 1) / .9)));
     const ab = [...f].map(Math.abs).sort((a, b) => a - b);
     const n = ab[0 | ab.length * .25], sg = ab[0 | ab.length * .95], snr = n > 0 ? sg / n : sg > 0 ? 15 : 0;
-    return Math.round(rs + as + Math.max(0, Math.min(30, 30 * Math.min(1, snr / 4))));
+    const score = Math.round(rs + as + Math.max(0, Math.min(30, 30 * Math.min(1, snr / 4))));
+    // Per-peak quality
+    const medIBI = [...ib].sort((a, b) => a - b)[0 | ib.length / 2];
+    const peakOk = [true];
+    for (let i = 0; i < ib.length; i++) peakOk.push(Math.abs(ib[i] - medIBI) < medIBI * 0.4);
+    return { score, peakOk };
   },
 
-  // ── Clean R-R series (shared by hrv + poincaré) ─────────────
+  // ═══ NEW: SQI-gated R-R extraction ════════════════════════
+  extractRRI(flt, pks, ts, sqiResult, motionClean) {
+    const rri = [];
+    for (let i = 1; i < pks.length; i++) {
+      if (sqiResult?.peakOk && (!sqiResult.peakOk[i - 1] || !sqiResult.peakOk[i])) continue;
+      if (motionClean && (!motionClean[pks[i - 1]] || !motionClean[pks[i]])) continue;
+      const ri0 = this.rp(flt, pks[i - 1]), ri1 = this.rp(flt, pks[i]);
+      const fl0 = Math.floor(ri0), fr0 = ri0 - fl0;
+      const fl1 = Math.floor(ri1), fr1 = ri1 - fl1;
+      const t0 = fl0 >= 0 && fl0 < ts.length - 1 ? ts[fl0] + fr0 * (ts[fl0 + 1] - ts[fl0]) : ts[Math.min(pks[i - 1], ts.length - 1)];
+      const t1 = fl1 >= 0 && fl1 < ts.length - 1 ? ts[fl1] + fr1 * (ts[fl1 + 1] - ts[fl1]) : ts[Math.min(pks[i], ts.length - 1)];
+      const ms = t1 - t0;
+      if (ms > 333 && ms < 1500) rri.push(Math.round(ms * 100) / 100);
+    }
+    return rri;
+  },
+
+  // ── Clean R-R series (shared by hrv + poincaré) ────────────
   cleanRR(rr) {
     if (rr.length < 3) return [];
-    // Step 1: physiological bounds (40–180 BPM)
     let v = rr.filter(r => r > 333 && r < 1500); if (v.length < 3) return [];
-    // Step 2: median filter — keep within ±20% of median
     const s = [...v].sort((a, b) => a - b), md = s[0 | s.length / 2];
     v = v.filter(r => Math.abs(r - md) < md * .20); if (v.length < 3) return [];
-    // Step 3: successive-diff filter — reject jumps >25% from previous
     const clean = [v[0]];
     for (let i = 1; i < v.length; i++) {
       if (Math.abs(v[i] - clean[clean.length - 1]) < clean[clean.length - 1] * 0.25) clean.push(v[i]);
@@ -145,7 +222,6 @@ export const D = {
     }
   },
 
-  // ── Resample RR to uniform rate ────────────────────────────
   resampleRR(rrMs, targetFs = 4) {
     if (rrMs.length < 4) return null;
     const tRR = [0];
@@ -167,46 +243,76 @@ export const D = {
 
   hann(n) { const w = new Float64Array(n); for (let i = 0; i < n; i++) w[i] = .5 * (1 - Math.cos(2 * Math.PI * i / (n - 1))); return w; },
 
-  // ── Frequency-domain HRV (PSD via FFT) ─────────────────────
+  // ═══ IMPROVED: Welch's PSD ════════════════════════════════
   freqHRV(rrMs) {
     if (rrMs.length < 10) return null;
-    const resamp = this.resampleRR(rrMs, 4);
+    const cleaned = this.cleanRR(rrMs);
+    if (cleaned.length < 10) return null;
+    const resamp = this.resampleRR(cleaned, 4);
     if (!resamp) return null;
     const { data, fs } = resamp;
     const mean = data.reduce((a, b) => a + b, 0) / data.length;
     for (let i = 0; i < data.length; i++) data[i] -= mean;
 
-    let N = 1; while (N < data.length) N <<= 1;
-    N = Math.max(N, 256);
-    const re = new Float64Array(N), im = new Float64Array(N);
-    const win = this.hann(data.length);
+    // Welch: segment length (power of 2), 50% overlap
+    let segLen = 1; while (segLen * 2 <= data.length) segLen <<= 1;
+    segLen = Math.max(64, Math.min(segLen, 256));
+    const overlap = segLen / 2;
+    const nSegs = Math.max(1, Math.floor((data.length - overlap) / (segLen - overlap)));
+    const N = Math.max(segLen, 256);
+
+    const win = this.hann(segLen);
     let winPow = 0; for (let i = 0; i < win.length; i++) winPow += win[i] * win[i];
     winPow /= win.length;
-    for (let i = 0; i < data.length; i++) re[i] = data[i] * win[i];
-    this.fft(re, im);
 
-    const nFreqs = N / 2 + 1, psd = new Float64Array(nFreqs), freqs = new Float64Array(nFreqs), df = fs / N;
-    for (let i = 0; i < nFreqs; i++) {
-      freqs[i] = i * df;
-      let p = (re[i] * re[i] + im[i] * im[i]) / (fs * N * winPow);
-      if (i > 0 && i < N / 2) p *= 2;
-      psd[i] = p * 1e6;
+    const nFreqs = N / 2 + 1;
+    const avgPsd = new Float64Array(nFreqs);
+    const freqs = new Float64Array(nFreqs);
+    const df = fs / N;
+    for (let i = 0; i < nFreqs; i++) freqs[i] = i * df;
+
+    let validSegs = 0;
+    for (let seg = 0; seg < nSegs; seg++) {
+      const start = seg * (segLen - overlap);
+      if (start + segLen > data.length) break;
+      const re = new Float64Array(N), im = new Float64Array(N);
+      for (let i = 0; i < segLen; i++) re[i] = data[start + i] * win[i];
+      this.fft(re, im);
+      for (let i = 0; i < nFreqs; i++) {
+        let p = (re[i] * re[i] + im[i] * im[i]) / (fs * N * winPow);
+        if (i > 0 && i < N / 2) p *= 2;
+        avgPsd[i] += p * 1e6;
+      }
+      validSegs++;
     }
+    // Fallback: single FFT if too short for Welch
+    if (validSegs === 0) {
+      const re = new Float64Array(N), im = new Float64Array(N);
+      for (let i = 0; i < Math.min(data.length, segLen); i++) re[i] = data[i] * win[i];
+      this.fft(re, im);
+      for (let i = 0; i < nFreqs; i++) {
+        let p = (re[i] * re[i] + im[i] * im[i]) / (fs * N * winPow);
+        if (i > 0 && i < N / 2) p *= 2;
+        avgPsd[i] = p * 1e6;
+      }
+      validSegs = 1;
+    }
+    for (let i = 0; i < nFreqs; i++) avgPsd[i] /= validSegs;
 
     let vlf = 0, lf = 0, hf = 0, tp = 0;
     for (let i = 0; i < nFreqs; i++) {
       const f = freqs[i];
-      if (f >= 0.003 && f < 0.04) vlf += psd[i] * df;
-      if (f >= 0.04 && f < 0.15) lf += psd[i] * df;
-      if (f >= 0.15 && f <= 0.4) hf += psd[i] * df;
-      if (f >= 0.003 && f <= 0.4) tp += psd[i] * df;
+      if (f >= 0.003 && f < 0.04) vlf += avgPsd[i] * df;
+      if (f >= 0.04 && f < 0.15) lf += avgPsd[i] * df;
+      if (f >= 0.15 && f <= 0.4) hf += avgPsd[i] * df;
+      if (f >= 0.003 && f <= 0.4) tp += avgPsd[i] * df;
     }
     const ratio = hf > 0 ? lf / hf : 0, lfhfSum = lf + hf || 1;
     return {
       lf: Math.round(lf * 10) / 10, hf: Math.round(hf * 10) / 10, vlf: Math.round(vlf * 10) / 10,
       tp: Math.round(tp * 10) / 10, ratio: Math.round(ratio * 100) / 100,
       lfNu: Math.round((lf / lfhfSum) * 100), hfNu: Math.round((hf / lfhfSum) * 100),
-      psd, freqs, nFreqs
+      psd: avgPsd, freqs, nFreqs
     };
   }
 };
