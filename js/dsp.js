@@ -71,16 +71,26 @@ export const D = {
     return Math.round(rs + as + Math.max(0, Math.min(30, 30 * Math.min(1, snr / 4))));
   },
 
+  // ── Clean R-R series (shared by hrv + poincaré) ─────────────
+  cleanRR(rr) {
+    if (rr.length < 3) return [];
+    // Step 1: physiological bounds (40–180 BPM)
+    let v = rr.filter(r => r > 333 && r < 1500); if (v.length < 3) return [];
+    // Step 2: median filter — keep within ±20% of median
+    const s = [...v].sort((a, b) => a - b), md = s[0 | s.length / 2];
+    v = v.filter(r => Math.abs(r - md) < md * .20); if (v.length < 3) return [];
+    // Step 3: successive-diff filter — reject jumps >25% from previous
+    const clean = [v[0]];
+    for (let i = 1; i < v.length; i++) {
+      if (Math.abs(v[i] - clean[clean.length - 1]) < clean[clean.length - 1] * 0.25) clean.push(v[i]);
+    }
+    return clean.length >= 3 ? clean : [];
+  },
+
   // ── Time-domain HRV ────────────────────────────────────────
   hrv(rr) {
-    if (rr.length < 3) return null;
-    // Physiological bounds: 40–180 BPM → 333–1500 ms
-    let v = rr.filter(r => r > 333 && r < 1500); if (v.length < 3) return null;
-    const s = [...v].sort((a, b) => a - b), md = s[0 | s.length / 2];
-    // Reject outliers: keep only within ±20% of median
-    const fl = v.filter(r => Math.abs(r - md) < md * .20); if (fl.length < 3) return null;
+    const fl = this.cleanRR(rr); if (fl.length < 3) return null;
     const m = fl.reduce((a, b) => a + b, 0) / fl.length;
-    // Use median for BPM (robust against remaining outliers)
     const sfl = [...fl].sort((a, b) => a - b), medRR = sfl[0 | sfl.length / 2];
     const sd = Math.sqrt(fl.map(r => (r - m) ** 2).reduce((a, b) => a + b, 0) / fl.length);
     const df = []; for (let i = 1; i < fl.length; i++) df.push(fl[i] - fl[i - 1]);
@@ -94,8 +104,7 @@ export const D = {
 
   // ── Poincaré SD1/SD2 ───────────────────────────────────────
   poincare(rr) {
-    if (rr.length < 4) return null;
-    const v = rr.filter(r => r > 300 && r < 1500); if (v.length < 4) return null;
+    const v = this.cleanRR(rr); if (v.length < 4) return null;
     const d1 = [], d2 = [];
     for (let i = 0; i < v.length - 1; i++) {
       d1.push((v[i + 1] - v[i]) / Math.SQRT2);
