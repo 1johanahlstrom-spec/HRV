@@ -67,7 +67,7 @@ export function drawPoincare(id, pd) {
   const { pairs, sd1, sd2 } = pd; if (pairs.length < 3) return;
   const pad = 28, allRR = pairs.flat();
   // Fixed axis range: 500–1100ms (covers 55–120 BPM)
-  const plotMin = 500, plotMax = 1100, plotRange = plotMax - plotMin;
+  const plotMin = 450, plotMax = 1050, plotRange = plotMax - plotMin;
   const plotW = w - 2 * pad, plotH = h - 2 * pad;
   const tx = v => pad + (v - plotMin) / plotRange * plotW, ty = v => pad + plotH - (v - plotMin) / plotRange * plotH;
 
