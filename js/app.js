@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// HRV MONITOR v5.4 — Main Application
+// HRV MONITOR v5.2 — Main Application
 // ═══════════════════════════════════════════════════════════════
 
 import { D } from './dsp.js';
@@ -14,7 +14,8 @@ let flt = [], pks = [], rri = [];
 let hrv = null, freqResult = null, sqi = 0, sqiHist = [];
 let motionClean = null, sqiResult = null;
 let measureBreathOn = false, measureBreathIdx = 0;
-const DUR = 60, SETTLE = 3;
+let DUR = 60;
+const SETTLE = 3;
 
 // ── Expose to HTML onclick handlers ──────────────────────────
 window.go = go;
@@ -29,6 +30,15 @@ window.toggleMeasureBreath = toggleMeasureBreath;
 window.setMeasureBreathPattern = setMeasureBreathPattern;
 window.startBreathing = () => startBreathing(handleBreathResult);
 window.stopBreathing = () => stopBreathing(handleBreathResult);
+window.setDuration = setDuration;
+
+function setDuration(sec) {
+  DUR = sec;
+  ['d30', 'd60', 'd120', 'd300'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', parseInt(el.dataset.dur) === sec);
+  });
+}
 
 function handleBreathResult(breathRRI, breathFlt, breathPks, breathSqi, breathStart) {
   rri = breathRRI; flt = breathFlt; pks = breathPks; sqi = breathSqi; sqiHist = [breathSqi];
@@ -155,6 +165,7 @@ function tick() {
   const el = Math.min(elapsed, DUR);
   document.getElementById('PG').style.width = (el / DUR * 100) + '%';
   document.getElementById('EL').textContent = Math.floor(el) + 's';
+  document.getElementById('DURLAB').textContent = DUR + 's';
   if (measureBreathOn) animateBreathCircle(elapsed, measureBreathIdx, 'MCIRC', 'MLAB', 'MSUB');
   if (elapsed >= DUR) { stop(); return; }
   raf = requestAnimationFrame(tick);
@@ -253,6 +264,9 @@ function res() {
     <div class="ch"><div class="chh"><span class="cl">Power Spectral Density (PSD)</span><span class="cl">Hz</span></div><canvas id="RPSD" height="130"></canvas></div>
     <div class="g3"><div class="rc"><span class="rv" style="color:#648cff">${fr.lf}</span><span class="rn">LF (ms²)</span><span class="rd">0.04–0.15 Hz</span></div><div class="rc"><span class="rv" style="color:#00f082">${fr.hf}</span><span class="rn">HF (ms²)</span><span class="rd">0.15–0.4 Hz</span></div><div class="rc"><span class="rv" style="color:#a078ff">${fr.ratio}</span><span class="rn">LF/HF</span><span class="rd">Sympatovagal balans</span></div></div>
     <div class="g2"><div class="rc"><span class="rv" style="font-size:18px">${fr.lfNu}%</span><span class="rn">LF n.u.</span><span class="rd">Normaliserad</span></div><div class="rc"><span class="rv" style="font-size:18px">${fr.hfNu}%</span><span class="rn">HF n.u.</span><span class="rd">Normaliserad</span></div></div>`;
+    if (fr.respRate) {
+      freqHTML += `<div class="rc" style="margin-top:5px"><span class="rv" style="color:#00b4d8;font-size:28px">🫁 ${fr.respRate}</span><span class="rn">Andningsfrekvens (andetag/min)</span><span class="rd">Estimerad från HF-toppen @ ${fr.respFreq} Hz</span></div>`;
+    }
   } else { freqHTML = '<div class="w">Frekvensanalys kräver minst 10 R-R intervall.</div>'; }
 
   let poincareHTML = '';
