@@ -51,6 +51,8 @@ let breathIdx = 0, breathRaf = null, breathStart = 0, breathActive = false;
 let breathRRI = [], breathRaw = [], breathRawG = [], breathTS = [];
 let breathFlt = [], breathPks = [], breathSqi = 0;
 let stmRef = null, fpsRef = 30, coRef = null;
+let breathSmoothedBPM = null;
+const BREATH_BPM_EMA_ALPHA = 0.25;
 
 export function setBreathPattern(idx) {
   breathIdx = idx;
@@ -59,6 +61,7 @@ export function setBreathPattern(idx) {
 
 export async function startBreathing(resCallback) {
   breathRRI = []; breathRaw = []; breathRawG = []; breathTS = [];
+  breathSmoothedBPM = null;
 
   if (!navigator.mediaDevices?.getUserMedia) return;
   const cfgs = [
@@ -149,8 +152,12 @@ function breathTick(resCallback) {
           for (let i = 1; i < pt.length; i++) { const ms = pt[i] - pt[i - 1]; if (ms > 333 && ms < 1500) breathRRI.push(Math.round(ms * 100) / 100); }
 
           if (breathRRI.length >= 2) {
-            const rc = breathRRI.slice(-12); const srt = [...rc].sort((a,b) => a - b); const med = srt[0 | srt.length / 2];
-            document.getElementById('BBPM').textContent = Math.round(6e4 / med);
+            const rc = breathRRI.slice(-12);
+            const srt = [...rc].sort((a,b) => a - b);
+            const med = srt[0 | srt.length / 2];
+            const rawBPM = Math.round(6e4 / med);
+            breathSmoothedBPM = breathSmoothedBPM === null ? rawBPM : Math.round(breathSmoothedBPM * (1 - BREATH_BPM_EMA_ALPHA) + rawBPM * BREATH_BPM_EMA_ALPHA);
+            document.getElementById('BBPM').textContent = breathSmoothedBPM;
           }
           const bhrv = D.hrv(breathRRI);
           if (bhrv) { document.getElementById('bxR').textContent = bhrv.rmssd; document.getElementById('bxS').textContent = bhrv.sdnn; }

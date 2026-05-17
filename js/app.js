@@ -16,6 +16,8 @@ let motionClean = null, sqiResult = null;
 let measureBreathOn = false, measureBreathIdx = 0;
 let DUR = 60;
 const SETTLE = 3;
+let smoothedBPM = null;
+const BPM_EMA_ALPHA = 0.25;
 
 // ── Expose to HTML onclick handlers ──────────────────────────
 window.go = go;
@@ -64,6 +66,7 @@ async function go() {
   b.disabled = true; b.textContent = '⏳ Startar kameran...'; er.classList.add('hide');
   raw = []; rawG = []; rawB = []; ts = []; flt = []; pks = []; rri = [];
   hrv = null; freqResult = null; sqi = 0; sqiHist = []; motionClean = null; sqiResult = null;
+  smoothedBPM = null;
 
   if (!navigator.mediaDevices?.getUserMedia) { er.innerHTML = '<b>⚠️</b> Kameran stöds inte.'; er.classList.remove('hide'); b.disabled = false; b.textContent = 'Starta mätning'; return; }
   const cfgs = [{ facingMode: 'environment', width: { ideal: 160 }, height: { ideal: 120 }, frameRate: { ideal: 60, min: 30 } }, { facingMode: 'environment' }, { facingMode: { ideal: 'environment' } }, true];
@@ -155,7 +158,14 @@ function tick() {
       if (pks.length >= 3) {
         // SQI-gated R-R extraction (skips bad peaks + motion segments)
         rri = D.extractRRI(flt, pks, ts, sqiResult, motionClean);
-        if (rri.length >= 2) { const rc = rri.slice(-12); const srt = [...rc].sort((a,b) => a - b); const med = srt[0 | srt.length / 2]; document.getElementById('BM').textContent = Math.round(6e4 / med); }
+        if (rri.length >= 2) {
+          const rc = rri.slice(-12);
+          const srt = [...rc].sort((a,b) => a - b);
+          const med = srt[0 | srt.length / 2];
+          const rawBPM = Math.round(6e4 / med);
+          smoothedBPM = smoothedBPM === null ? rawBPM : Math.round(smoothedBPM * (1 - BPM_EMA_ALPHA) + rawBPM * BPM_EMA_ALPHA);
+          document.getElementById('BM').textContent = smoothedBPM;
+        }
         if (rri.length > 3) { document.getElementById('RS').classList.remove('hide'); document.getElementById('RC').textContent = rri.length + ' st'; drawRR('RRC', rri); }
         hrv = D.hrv(rri);
         if (hrv) { document.getElementById('MM').classList.remove('hide'); document.getElementById('xR').textContent = hrv.rmssd; document.getElementById('xS').textContent = hrv.sdnn; document.getElementById('xP').textContent = hrv.pnn50 + '%'; }
