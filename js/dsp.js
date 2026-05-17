@@ -1,659 +1,214 @@
-// ═══════════════════════════════════════════════════════════════
-// DSP ENGINE v5 — Enhanced signal processing pipeline
-//
-// Improvements over v4:
-// 1. Detrending (moving-average baseline removal)
-// 2. Adaptive peak threshold (tracks recent peak amplitudes)
-// 3. Blue-channel motion artifact detection
-// 4. SQI-gated R-R extraction
-// 5. Welch's method for PSD estimation
-// ═══════════════════════════════════════════════════════════════
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>HRV Monitor v5.5</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08090c;color:#c8cdd6;font-family:system-ui,sans-serif;font-size:13px;padding:14px;max-width:420px;margin:0 auto;min-height:100vh;-webkit-user-select:none;user-select:none}
+video,.hcv{display:none}
+.hdr{display:flex;align-items:center;gap:10px;border-bottom:1px solid #ffffff0a;padding-bottom:12px;margin-bottom:14px}
+.logo{width:34px;height:34px;border-radius:8px;background:#00f0820d;border:1px solid #00f0821a;display:flex;align-items:center;justify-content:center}
+h1{font-size:15px;color:#eef0f4;font-weight:700}
+.sub{font-size:10px;color:#8a8f98;text-transform:uppercase;letter-spacing:.04em;margin-top:1px}
+.sec{display:flex;flex-direction:column;gap:10px}
+.card{background:#ffffff04;border:1px solid #ffffff0a;border-radius:14px;padding:18px 16px}
+.ct{font-size:13px;font-weight:600;color:#a0a5ae;text-align:center;margin-bottom:12px}
+.st{display:flex;align-items:center;gap:9px;font-size:11px;color:#8a9098;margin-bottom:6px}
+.sn{width:20px;height:20px;border-radius:50%;background:#00f08212;color:#00f082;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.bp{background:linear-gradient(135deg,#00f082,#00c86a);color:#080a0c;border:none;border-radius:11px;padding:15px;font-size:14px;font-weight:700;cursor:pointer;width:100%;font-family:inherit}
+.bp:disabled{opacity:.5}
+.bd{background:#ff2d5512;color:#ff2d55;border:1px solid #ff2d5530;border-radius:11px;padding:13px;font-size:13px;font-weight:600;cursor:pointer;width:100%;font-family:inherit}
+.err{padding:14px;border-radius:10px;background:#ff3c3c0f;border:1px solid #ff3c3c26;font-size:11px;color:#e0a0a0;line-height:1.6}
+.sr{display:flex;gap:7px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:7px;font-size:10px;font-weight:600}
+.dt{width:5px;height:5px;border-radius:50%}
+.pb{height:3px;background:#ffffff08;border-radius:2px;overflow:hidden}
+.pf{height:100%;background:linear-gradient(90deg,#00f082,#00c86a);border-radius:2px;transition:width .3s;width:0}
+.tr{display:flex;justify-content:space-between;font-size:10px;color:#7a808a}
+.bb{text-align:center;padding:6px 0}
+.bn{font-size:48px;font-weight:800;color:#00f082;text-shadow:0 0 20px #00f08240;letter-spacing:-.03em;line-height:1}
+.bu{display:block;font-size:11px;color:#8a8f98;text-transform:uppercase;letter-spacing:.1em;margin-top:2px}
+.ch{background:#00000033;border:1px solid #00f0820d;border-radius:9px;padding:7px 9px;overflow:hidden}
+.cl{font-size:10px;color:#7a808a;text-transform:uppercase;letter-spacing:.07em}
+.chh{display:flex;justify-content:space-between;margin-bottom:3px}
+canvas{display:block;width:100%}
+.mr{display:flex;gap:5px}
+.mc{flex:1;background:#ffffff03;border:1px solid #ffffff09;border-radius:9px;padding:9px 5px;text-align:center}
+.mv{display:block;font-size:16px;font-weight:700;color:#dde0e6}
+.ml{display:block;font-size:10px;color:#8a8f98;text-transform:uppercase;letter-spacing:.1em;margin-top:1.5px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.rc{background:#ffffff04;border:1px solid #ffffff0a;border-radius:11px;padding:12px 8px;text-align:center}
+.rv{display:block;font-size:22px;font-weight:700;color:#dde0e6;line-height:1.1}
+.rn{display:block;font-size:10px;color:#8a9098;margin-top:3px;font-weight:600}
+.rd{display:block;font-size:10px;color:#7a808a;margin-top:1.5px}
+.w{font-size:10px;color:#8a9098;background:#ffd60a05;border:1px solid #ffd60a0f;border-radius:7px;padding:7px 10px;line-height:1.5}
+.settle{text-align:center;padding:12px;font-size:12px;color:#ffd60a;background:#ffd60a0a;border:1px solid #ffd60a18;border-radius:9px}
+.dg{background:#ffffff04;border:1px solid #ffffff0a;border-radius:9px;padding:8px 12px;font-size:10px}
+.dr{display:flex;justify-content:space-between;padding:2.5px 0}
+.dk{color:#8a8f98}.dv{color:#a0a5ae;font-weight:600}
+.section-label{font-size:11px;color:#8a9098;text-transform:uppercase;letter-spacing:.08em;margin:4px 0 -4px 2px}
+.ref{background:#ffffff04;border:1px solid #ffffff0a;border-radius:11px;padding:12px;font-size:10px;line-height:1.6}
+.ref-title{font-size:11px;font-weight:700;color:#a0a5ae;margin-bottom:8px}
+.ref-table{width:100%;border-collapse:collapse}
+.ref-table th{text-align:left;color:#8a9098;font-weight:600;padding:3px 4px;border-bottom:1px solid #ffffff08;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+.ref-table td{padding:3px 4px;color:#8a9098;font-size:10px;border-bottom:1px solid #ffffff04}
+.ref-table td:first-child{color:#a0a5ae;font-weight:600}
+.ref-table .good{color:#00f082}.ref-table .med{color:#ffd60a}.ref-table .high{color:#ff6b35}.ref-table .stress{color:#ff2d55}
+.btn-test{background:#a078ff18;color:#a078ff;border:1px solid #a078ff30;border-radius:11px;padding:12px;font-size:12px;font-weight:600;cursor:pointer;width:100%;font-family:inherit}
+.btn-breath{background:#00b4d818;color:#00b4d8;border:1px solid #00b4d830;border-radius:11px;padding:14px;font-size:13px;font-weight:700;cursor:pointer;width:100%;font-family:inherit}
+.breath-ring{width:180px;height:180px;border-radius:50%;margin:0 auto;position:relative;display:flex;align-items:center;justify-content:center}
+.breath-circle{border-radius:50%;transition:all 0.3s ease;display:flex;align-items:center;justify-content:center;flex-direction:column}
+.breath-label{font-size:18px;font-weight:700;color:#e0e8f0;pointer-events:none}
+.breath-sub{font-size:11px;color:#8a9098;margin-top:2px;pointer-events:none}
+.breath-opts{display:flex;gap:6px}
+.breath-opt{flex:1;background:#ffffff06;border:1px solid #ffffff0d;border-radius:8px;padding:8px 6px;font-size:10px;color:#8a9098;cursor:pointer;text-align:center;line-height:1.4}
+.breath-opt.active{background:#00b4d815;border-color:#00b4d840;color:#00b4d8}
+.coherence-bar{height:8px;border-radius:4px;background:#ffffff08;overflow:hidden;margin-top:4px}
+.coherence-fill{height:100%;border-radius:4px;transition:width 1s ease,background .5s}
+.test-opts{display:flex;gap:6px;flex-wrap:wrap}
+.test-opt{background:#ffffff06;border:1px solid #ffffff0d;border-radius:8px;padding:8px 12px;font-size:11px;color:#8a8f98;cursor:pointer;flex:1;text-align:center;min-width:80px}
+.test-opt:hover{background:#ffffff0d;color:#c8cdd6}
+.hist{background:#ffffff03;border:1px solid #ffffff08;border-radius:11px;padding:12px;margin-top:2px}
+.hist-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.hist-title span{font-size:11px;font-weight:600;color:#a0a5ae}
+.hist-clear{font-size:10px;color:#ff2d55;cursor:pointer;background:none;border:none;font-family:inherit}
+.hist-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #ffffff06;font-size:11px}
+.hist-row:last-child{border:none}
+.hist-date{color:#8a9098;min-width:70px}
+.hist-morning{font-size:9px;background:#ffd60a15;color:#ffd60a;padding:1px 4px;border-radius:3px;margin-left:4px}
+.hist-val{color:#00f082;font-weight:700;font-size:13px}
+.hist-sub{color:#7a808a;font-size:10px}
+.hist-empty{text-align:center;padding:16px 0;font-size:11px;color:#7a808a}
+.trend-box{background:#00000033;border:1px solid #00f0820d;border-radius:9px;padding:7px 9px;overflow:hidden;margin-top:4px}
+.hide{display:none!important}
+</style>
+</head>
+<body>
 
-export const D = {
+<video id="V" playsinline muted></video>
+<canvas id="C" class="hcv"></canvas>
 
-  // ── Butterworth bandpass ───────────────────────────────────
-  bp2(fs, fl, fh) {
-    const wL = 2 * Math.PI * fl / fs, wH = 2 * Math.PI * fh / fs;
-    const wLw = 2 * fs * Math.tan(wL / 2), wHw = 2 * fs * Math.tan(wH / 2);
-    const bw = wHw - wLw, w0 = Math.sqrt(wLw * wHw), Q = .7071;
-    const K = 2 * fs, K2 = K * K, w02 = w0 * w0, a0 = K2 + bw * K / Q + w02;
-    return { b: [bw * K / a0, 0, -bw * K / a0], a: [1, (2 * w02 - 2 * K2) / a0, (K2 - bw * K / Q + w02) / a0] };
-  },
-  bp4(fs, fl = .5, fh = 4) { return [this.bp2(fs, fl, fh), this.bp2(fs, fl, fh)]; },
+<div class="hdr">
+  <div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3.5 12h2l1.5-3 2 6 2-8 2 7 1.5-4 1.5 2h4" stroke="#00f082" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <div style="flex:1"><h1>HRV Monitor <span style="font-size:9px;color:#00f082;vertical-align:super">v5.5</span></h1><div class="sub">Tids- &amp; frekvensdomän · LF/HF · Andning</div></div>
+</div>
+<div style="text-align:right;font-size:9px;color:#5a6068;margin-top:-10px;margin-bottom:6px" id="BVER">Build 2026-05-15d</div>
 
-  // ── IIR biquad filter ──────────────────────────────────────
-  af(s, c) {
-    const o = new Float64Array(s.length); let z1 = 0, z2 = 0;
-    for (let i = 0; i < s.length; i++) {
-      const x = s[i], y = c.b[0] * x + z1;
-      z1 = c.b[1] * x - c.a[1] * y + z2;
-      z2 = c.b[2] * x - c.a[2] * y;
-      o[i] = y;
-    }
-    return o;
-  },
+<!-- IDLE -->
+<div id="P0" class="sec">
+  <div class="card">
+    <div style="text-align:center;margin-bottom:14px"><svg width="48" height="48" viewBox="0 0 100 100"><defs><radialGradient id="rg" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ff2d55" stop-opacity=".3"/><stop offset="100%" stop-color="#ff2d55" stop-opacity="0"/></radialGradient></defs><circle cx="50" cy="50" r="38" fill="url(#rg)"/><ellipse cx="50" cy="44" rx="15" ry="21" fill="none" stroke="#ff2d55" stroke-width="1.5" opacity=".6"/><circle cx="50" cy="40" r="4" fill="#ff2d55" opacity=".5"><animate attributeName="r" values="3;6;3" dur="1.4s" repeatCount="indefinite"/></circle></svg></div>
+    <div class="ct">Så funkar det</div>
+    <div class="st"><span class="sn">1</span><b>Tänd ficklampan:</b> svep ner från toppen → tryck 🔦</div>
+    <div class="st"><span class="sn">2</span>Tryck "Starta mätning" nedan</div>
+    <div class="st"><span class="sn">3</span>Lägg pekfingret lätt över kameran + lampan</div>
+    <div class="st"><span class="sn">4</span>Vila handen på ett bord — håll stilla i 60 sek</div>
+  </div>
+  <div id="ER" class="err hide"></div>
+  <div class="breath-opts" style="margin-bottom:8px">
+    <div id="d30" class="breath-opt" data-dur="30" onclick="setDuration(30)"><b>30s</b><br>Snabb</div>
+    <div id="d60" class="breath-opt active" data-dur="60" onclick="setDuration(60)"><b>60s</b><br>Standard</div>
+    <div id="d120" class="breath-opt" data-dur="120" onclick="setDuration(120)"><b>2 min</b><br>Noggrann</div>
+    <div id="d300" class="breath-opt" data-dur="300" onclick="setDuration(300)"><b>5 min</b><br>Klinisk</div>
+  </div>
+  <button id="SB" class="bp" onclick="go()">Starta mätning</button>
+  <button class="btn-breath" onclick="startBreathing()">🫁 Andningsguide med HRV-koherens</button>
+  <button class="btn-test" onclick="document.getElementById('TOPTS').classList.toggle('hide')">🧪 Testläge — kör med syntetisk data</button>
+  <div id="TOPTS" class="test-opts hide">
+    <div class="test-opt" onclick="runTest(20)">RMSSD ~20<br><span style="font-size:10px;color:#ff6b35">Stokastisk</span></div>
+    <div class="test-opt" onclick="runTest(50)">RMSSD ~50<br><span style="font-size:10px;color:#ffd60a">Stokastisk</span></div>
+    <div class="test-opt" onclick="runTest(80)">RMSSD ~80<br><span style="font-size:10px;color:#00f082">Stokastisk</span></div>
+    <div class="test-opt" onclick="runDetTest()" style="border-color:#a078ff40">RMSSD 50.0<br><span style="font-size:10px;color:#a078ff">Deterministisk</span></div>
+  </div>
+  <div id="HIST" class="hist"></div>
+  <div id="TREND" class="trend-box hide">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span style="font-size:11px;font-weight:600;color:#a0a5ae">RMSSD trend</span>
+      <span style="font-size:9px;color:#6a7a8a"><span style="color:#00f082">● Mätning</span> &nbsp;<span style="color:#ffd60a">● Morgon</span> &nbsp;<span style="color:#648cff">━ 7d medel</span></span>
+    </div>
+    <canvas id="TCHART" height="120"></canvas>
+  </div>
+</div>
 
-  // ── Zero-phase filter (filtfilt) ───────────────────────────
-  ff1(s, c) {
-    const p = Math.min(9, s.length - 1), pd = new Float64Array(s.length + 2 * p);
-    for (let i = 0; i < p; i++) { pd[i] = 2 * s[0] - s[p - i]; pd[s.length + p + i] = 2 * s[s.length - 1] - s[s.length - 2 - i]; }
-    for (let i = 0; i < s.length; i++) pd[p + i] = s[i];
-    const f = this.af(pd, c), r = new Float64Array(f.length);
-    for (let i = 0; i < f.length; i++) r[i] = f[f.length - 1 - i];
-    const b = this.af(r, c), o = new Float64Array(s.length);
-    for (let i = 0; i < s.length; i++) o[i] = b[b.length - 1 - p - i];
-    return o;
-  },
-  ff(s, secs) { let o = s; for (const sec of secs) o = this.ff1(o, sec); return o; },
+<!-- MEASURING -->
+<div id="P1" class="sec hide">
+  <div id="SETTLE" class="settle hide">⏳ Signalen stabiliseras… håll stilla</div>
+  <div class="sr">
+    <div id="fc" class="chip" style="background:#ff2d550d;color:#ff2d55;border:1px solid #ff2d551f"><span id="fd" class="dt" style="background:#ff2d55;box-shadow:0 0 5px #ff2d5580"></span><span id="ft">Placera finger</span></div>
+    <div id="sc" class="chip" style="background:#5550d;color:#555;border:1px solid #5551f">SQI: <span id="st2">—</span></div>
+    <div class="chip" style="background:#ffd60a0d;border:1px solid #ffd60a1f"><span id="TORCH" style="font-size:10px;color:#ffd60a">Lampa: …</span></div>
+  </div>
+  <div class="pb"><div id="PG" class="pf"></div></div>
+  <div class="tr"><span id="EL">0s</span><span id="DURLAB">60s</span></div>
+  <div class="bb"><span id="BM" class="bn">—</span><span class="bu">BPM</span></div>
+  <button id="MBTN" class="btn-breath" style="padding:10px;font-size:11px" onclick="toggleMeasureBreath()">🫁 Visa andningsguide</button>
+  <div id="MBREATH" class="hide">
+    <div class="breath-opts" style="margin-bottom:8px">
+      <div id="mo1" class="breath-opt active" onclick="setMeasureBreathPattern(0)"><b>Resonans</b><br>5.5/min</div>
+      <div id="mo2" class="breath-opt" onclick="setMeasureBreathPattern(1)"><b>4-7-8</b><br>Lugn</div>
+      <div id="mo3" class="breath-opt" onclick="setMeasureBreathPattern(2)"><b>Box</b><br>4×4</div>
+    </div>
+    <div class="breath-ring" style="margin-bottom:8px">
+      <div id="MCIRC" class="breath-circle" style="width:60px;height:60px;background:rgba(0,180,216,0.15);border:2px solid rgba(0,180,216,0.4)">
+        <span id="MLAB" class="breath-label" style="font-size:15px">Redo</span>
+        <span id="MSUB" class="breath-sub"></span>
+      </div>
+    </div>
+  </div>
+  <div class="ch"><div class="chh"><span class="cl">PPG (filtrerad)</span><span class="cl">Butterworth 4:e ordn.</span></div><canvas id="W" height="120"></canvas></div>
+  <div id="RS" class="ch hide"><div class="chh"><span class="cl">R-R intervall</span><span id="RC" class="cl"></span></div><canvas id="RRC" height="65"></canvas></div>
+  <div id="MM" class="mr hide">
+    <div class="mc"><span id="xR" class="mv">—</span><span class="ml">RMSSD</span></div>
+    <div class="mc"><span id="xS" class="mv">—</span><span class="ml">SDNN</span></div>
+    <div class="mc"><span id="xP" class="mv">—</span><span class="ml">pNN50</span></div>
+  </div>
+  <button class="bd" onclick="stop()">Avsluta → Resultat</button>
+</div>
 
-  // ═══ NEW: Detrending — remove slow baseline drift ═════════
-  detrend(s, windowSec, fs) {
-    const w = Math.max(3, Math.round(windowSec * fs)) | 1;
-    const half = (w - 1) / 2;
-    const out = new Float64Array(s.length);
-    for (let i = 0; i < s.length; i++) {
-      const left = Math.max(0, i - half), right = Math.min(s.length - 1, i + half);
-      let sum = 0; for (let j = left; j <= right; j++) sum += s[j];
-      out[i] = s[i] - sum / (right - left + 1);
-    }
-    return out;
-  },
+<!-- RESULTS -->
+<div id="P2" class="sec hide"></div>
 
-  // ═══ NEW: Blue-channel motion artifact detection ══════════
-  // Returns boolean array: true = clean, false = motion
-  detectMotion(blueChannel, fs, windowSec = 0.5) {
-    const w = Math.max(3, Math.round(windowSec * fs));
-    const n = blueChannel.length;
-    const clean = new Array(n).fill(true);
-    if (n < w * 2) return clean;
-    const vars = [];
-    for (let i = 0; i <= n - w; i++) {
-      let sum = 0, sum2 = 0;
-      for (let j = i; j < i + w; j++) { sum += blueChannel[j]; sum2 += blueChannel[j] * blueChannel[j]; }
-      vars.push(sum2 / w - (sum / w) ** 2);
-    }
-    if (vars.length < 3) return clean;
-    const sv = [...vars].sort((a, b) => a - b);
-    const threshold = sv[0 | sv.length / 2] * 3;
-    for (let i = 0; i < vars.length; i++) {
-      if (vars[i] > threshold) {
-        for (let j = i; j < Math.min(i + w, n); j++) clean[j] = false;
-      }
-    }
-    return clean;
-  },
+<!-- BREATHING GUIDE -->
+<div id="P3" class="sec hide">
+  <div class="breath-opts">
+    <div id="bo1" class="breath-opt active" onclick="setBreathPattern(0)"><b>Resonans</b><br>5.5/min</div>
+    <div id="bo2" class="breath-opt" onclick="setBreathPattern(1)"><b>4-7-8</b><br>Lugn</div>
+    <div id="bo3" class="breath-opt" onclick="setBreathPattern(2)"><b>Box</b><br>4×4</div>
+  </div>
+  <div class="breath-ring">
+    <div id="BCIRC" class="breath-circle" style="width:60px;height:60px;background:rgba(0,180,216,0.15);border:2px solid rgba(0,180,216,0.4)">
+      <span id="BLAB" class="breath-label">Redo</span>
+      <span id="BSUB" class="breath-sub"></span>
+    </div>
+  </div>
+  <div class="sr" style="justify-content:center">
+    <div id="bfc" class="chip" style="background:#ff2d550d;color:#ff2d55;border:1px solid #ff2d551f"><span id="bfd" class="dt" style="background:#ff2d55"></span><span id="bft">Placera finger</span></div>
+  </div>
+  <div style="text-align:center;padding:4px 0">
+    <span id="BBPM" class="bn" style="font-size:38px">—</span><span class="bu">BPM</span>
+  </div>
+  <div class="card" style="padding:10px 14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-size:10px;color:#8a9098;text-transform:uppercase;letter-spacing:.05em">Koherens</span>
+      <span id="BCOH" style="font-size:14px;font-weight:700;color:#555">—</span>
+    </div>
+    <div class="coherence-bar"><div id="BCOF" class="coherence-fill" style="width:0;background:#555"></div></div>
+    <div style="display:flex;justify-content:space-between;margin-top:3px;font-size:9px;color:#7a808a">
+      <span>Låg</span><span>Medium</span><span>Hög</span>
+    </div>
+  </div>
+  <div class="mr">
+    <div class="mc"><span id="bxR" class="mv" style="font-size:14px">—</span><span class="ml">RMSSD</span></div>
+    <div class="mc"><span id="bxS" class="mv" style="font-size:14px">—</span><span class="ml">SDNN</span></div>
+    <div class="mc"><span id="bxT" class="mv" style="font-size:14px">0s</span><span class="ml">Tid</span></div>
+  </div>
+  <div class="ch"><div class="chh"><span class="cl">PPG (realtid)</span></div><canvas id="BW" height="80"></canvas></div>
+  <button class="bd" onclick="stopBreathing()">Avsluta andningsguide</button>
+</div>
 
-  // ═══ IMPROVED: Adaptive peak detection ════════════════════
-  rp(d, i) {
-    if (i <= 0 || i >= d.length - 1) return i;
-    const dn = 2 * (2 * d[i] - d[i - 1] - d[i + 1]);
-    return Math.abs(dn) < 1e-10 ? i : i + Math.max(-.5, Math.min(.5, (d[i - 1] - d[i + 1]) / dn));
-  },
-
-  fp(d, md, th = .35) {
-    const pk = []; if (d.length < 5) return pk;
-    const s = [...d].sort((a, b) => a - b);
-    let t = s[0 | s.length * .1] + (s[0 | s.length * .9] - s[0 | s.length * .1]) * th;
-    const recentAmps = [];
-    for (let i = 2; i < d.length - 2; i++) {
-      if (recentAmps.length >= 3) {
-        const avgAmp = recentAmps.reduce((a, b) => a + b, 0) / recentAmps.length;
-        t = avgAmp * 0.4;
-      }
-      if (d[i] > t && d[i] >= d[i - 1] && d[i] >= d[i + 1] && d[i] > d[i - 2] && d[i] > d[i + 2]) {
-        if (!pk.length || i - pk[pk.length - 1] >= md) {
-          pk.push(i);
-          recentAmps.push(d[i]);
-          if (recentAmps.length > 8) recentAmps.shift();
-        } else if (d[i] > d[pk[pk.length - 1]]) {
-          recentAmps[recentAmps.length - 1] = d[i];
-          pk[pk.length - 1] = i;
-        }
-      }
-    }
-    return pk;
-  },
-
-  // ═══ IMPROVED: SQI with per-peak quality flags ════════════
-  sq(f, pk, fs) {
-    if (pk.length < 3) return { score: 0, peakOk: [] };
-    const ib = []; for (let i = 1; i < pk.length; i++) ib.push((pk[i] - pk[i - 1]) / fs * 1e3);
-    const m = ib.reduce((a, b) => a + b, 0) / ib.length;
-    const sd = Math.sqrt(ib.map(x => (x - m) ** 2).reduce((a, b) => a + b, 0) / ib.length);
-    const rs = Math.max(0, Math.min(40, 40 * (1 - sd / m / .5)));
-    const am = pk.map(i => f[i]), mA = am.reduce((a, b) => a + b, 0) / am.length;
-    const sA = Math.sqrt(am.map(x => (x - mA) ** 2).reduce((a, b) => a + b, 0) / am.length);
-    const as = Math.max(0, Math.min(30, 30 * (1 - (mA ? sA / Math.abs(mA) : 1) / .9)));
-    const ab = [...f].map(Math.abs).sort((a, b) => a - b);
-    const n = ab[0 | ab.length * .25], sg = ab[0 | ab.length * .95], snr = n > 0 ? sg / n : sg > 0 ? 15 : 0;
-    const score = Math.round(rs + as + Math.max(0, Math.min(30, 30 * Math.min(1, snr / 4))));
-    // Per-peak quality
-    const medIBI = [...ib].sort((a, b) => a - b)[0 | ib.length / 2];
-    const peakOk = [true];
-    for (let i = 0; i < ib.length; i++) peakOk.push(Math.abs(ib[i] - medIBI) < medIBI * 0.4);
-    return { score, peakOk };
-  },
-
-  // ═══ NEW: SQI-gated R-R extraction ════════════════════════
-  extractRRI(flt, pks, ts, sqiResult, motionClean) {
-    const rri = [];
-    for (let i = 1; i < pks.length; i++) {
-      if (sqiResult?.peakOk && (!sqiResult.peakOk[i - 1] || !sqiResult.peakOk[i])) continue;
-      if (motionClean && (!motionClean[pks[i - 1]] || !motionClean[pks[i]])) continue;
-      const ri0 = this.rp(flt, pks[i - 1]), ri1 = this.rp(flt, pks[i]);
-      const fl0 = Math.floor(ri0), fr0 = ri0 - fl0;
-      const fl1 = Math.floor(ri1), fr1 = ri1 - fl1;
-      const t0 = fl0 >= 0 && fl0 < ts.length - 1 ? ts[fl0] + fr0 * (ts[fl0 + 1] - ts[fl0]) : ts[Math.min(pks[i - 1], ts.length - 1)];
-      const t1 = fl1 >= 0 && fl1 < ts.length - 1 ? ts[fl1] + fr1 * (ts[fl1 + 1] - ts[fl1]) : ts[Math.min(pks[i], ts.length - 1)];
-      const ms = t1 - t0;
-      if (ms > 333 && ms < 1500) rri.push(Math.round(ms * 100) / 100);
-    }
-    return rri;
-  },
-
-  // ── Clean R-R series (shared by hrv + poincaré) ────────────
-  cleanRR(rr) {
-    if (rr.length < 3) return [];
-    let v = rr.filter(r => r > 333 && r < 1500); if (v.length < 3) return [];
-    const s = [...v].sort((a, b) => a - b), md = s[0 | s.length / 2];
-    v = v.filter(r => Math.abs(r - md) < md * .20); if (v.length < 3) return [];
-    const clean = [v[0]];
-    for (let i = 1; i < v.length; i++) {
-      if (Math.abs(v[i] - clean[clean.length - 1]) < clean[clean.length - 1] * 0.25) clean.push(v[i]);
-    }
-    return clean.length >= 3 ? clean : [];
-  },
-
-  // ── Time-domain HRV ────────────────────────────────────────
-  hrv(rr) {
-    const fl = this.cleanRR(rr); if (fl.length < 3) return null;
-    const m = fl.reduce((a, b) => a + b, 0) / fl.length;
-    const sfl = [...fl].sort((a, b) => a - b), medRR = sfl[0 | sfl.length / 2];
-    const sd = Math.sqrt(fl.map(r => (r - m) ** 2).reduce((a, b) => a + b, 0) / fl.length);
-    const df = []; for (let i = 1; i < fl.length; i++) df.push(fl[i] - fl[i - 1]);
-    const rm = Math.sqrt(df.map(d => d * d).reduce((a, b) => a + b, 0) / df.length);
-    const pn = (df.filter(d => Math.abs(d) > 50).length / df.length) * 100;
-    return {
-      bpm: Math.round(6e5 / medRR) / 10, sdnn: Math.round(sd * 10) / 10, rmssd: Math.round(rm * 10) / 10,
-      pnn50: Math.round(pn * 10) / 10, meanRR: Math.round(m * 10) / 10, count: fl.length, rej: rr.length - fl.length
-    };
-  },
-
-  // ── Poincaré SD1/SD2 ───────────────────────────────────────
-  poincare(rr) {
-    const v = this.cleanRR(rr); if (v.length < 4) return null;
-    const d1 = [], d2 = [];
-    for (let i = 0; i < v.length - 1; i++) {
-      d1.push((v[i + 1] - v[i]) / Math.SQRT2);
-      d2.push((v[i + 1] + v[i]) / Math.SQRT2);
-    }
-    const m1 = d1.reduce((a, b) => a + b, 0) / d1.length;
-    const m2 = d2.reduce((a, b) => a + b, 0) / d2.length;
-    const sd1 = Math.sqrt(d1.map(x => (x - m1) ** 2).reduce((a, b) => a + b, 0) / d1.length);
-    const sd2 = Math.sqrt(d2.map(x => (x - m2) ** 2).reduce((a, b) => a + b, 0) / d2.length);
-    const ratio = sd2 > 0 ? sd1 / sd2 : 0;
-    const pairs = [];
-    for (let i = 0; i < v.length - 1; i++) pairs.push([v[i], v[i + 1]]);
-    return { sd1: Math.round(sd1 * 10) / 10, sd2: Math.round(sd2 * 10) / 10, ratio: Math.round(ratio * 100) / 100, pairs };
-  },
-
-  // ── FFT (Radix-2, Cooley-Tukey) ────────────────────────────
-  fft(re, im) {
-    const n = re.length;
-    for (let i = 1, j = 0; i < n; i++) {
-      let bit = n >> 1;
-      while (j & bit) { j ^= bit; bit >>= 1; }
-      j ^= bit;
-      if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
-    }
-    for (let len = 2; len <= n; len <<= 1) {
-      const ang = 2 * Math.PI / len, wRe = Math.cos(ang), wIm = -Math.sin(ang);
-      for (let i = 0; i < n; i += len) {
-        let curRe = 1, curIm = 0;
-        for (let j = 0; j < len / 2; j++) {
-          const uRe = re[i + j], uIm = im[i + j];
-          const vRe = re[i + j + len / 2] * curRe - im[i + j + len / 2] * curIm;
-          const vIm = re[i + j + len / 2] * curIm + im[i + j + len / 2] * curRe;
-          re[i + j] = uRe + vRe; im[i + j] = uIm + vIm;
-          re[i + j + len / 2] = uRe - vRe; im[i + j + len / 2] = uIm - vIm;
-          const nc = curRe * wRe - curIm * wIm; curIm = curRe * wIm + curIm * wRe; curRe = nc;
-        }
-      }
-    }
-  },
-
-  resampleRR(rrMs, targetFs = 4) {
-    if (rrMs.length < 4) return null;
-    const tRR = [0];
-    for (let i = 0; i < rrMs.length; i++) tRR.push(tRR[tRR.length - 1] + rrMs[i] / 1000);
-    const yRR = [rrMs[0] / 1000];
-    for (let i = 0; i < rrMs.length; i++) yRR.push(rrMs[i] / 1000);
-    const duration = tRR[tRR.length - 1], nSamples = Math.floor(duration * targetFs);
-    if (nSamples < 8) return null;
-    const uniform = new Float64Array(nSamples);
-    for (let i = 0; i < nSamples; i++) {
-      const t = i / targetFs;
-      let k = 1; while (k < tRR.length - 1 && tRR[k] < t) k++;
-      k = Math.min(k, tRR.length - 1);
-      const t0 = tRR[k - 1], t1 = tRR[k], frac = (t1 !== t0) ? (t - t0) / (t1 - t0) : 0;
-      uniform[i] = yRR[k - 1] + (yRR[k] - yRR[k - 1]) * frac;
-    }
-    return { data: uniform, fs: targetFs, duration };
-  },
-
-  hann(n) { const w = new Float64Array(n); for (let i = 0; i < n; i++) w[i] = .5 * (1 - Math.cos(2 * Math.PI * i / (n - 1))); return w; },
-
-  // ═══ IMPROVED: Welch's PSD ════════════════════════════════
-  freqHRV(rrMs) {
-    if (rrMs.length < 10) return null;
-    const cleaned = this.cleanRR(rrMs);
-    if (cleaned.length < 10) return null;
-    const resamp = this.resampleRR(cleaned, 4);
-    if (!resamp) return null;
-    const { data, fs } = resamp;
-    const mean = data.reduce((a, b) => a + b, 0) / data.length;
-    for (let i = 0; i < data.length; i++) data[i] -= mean;
-
-    // Welch: segment length (power of 2), 50% overlap
-    let segLen = 1; while (segLen * 2 <= data.length) segLen <<= 1;
-    segLen = Math.max(64, Math.min(segLen, 256));
-    const overlap = segLen / 2;
-    const nSegs = Math.max(1, Math.floor((data.length - overlap) / (segLen - overlap)));
-    const N = Math.max(segLen, 256);
-
-    const win = this.hann(segLen);
-    let winPow = 0; for (let i = 0; i < win.length; i++) winPow += win[i] * win[i];
-    winPow /= win.length;
-
-    const nFreqs = N / 2 + 1;
-    const avgPsd = new Float64Array(nFreqs);
-    const freqs = new Float64Array(nFreqs);
-    const df = fs / N;
-    for (let i = 0; i < nFreqs; i++) freqs[i] = i * df;
-
-    let validSegs = 0;
-    for (let seg = 0; seg < nSegs; seg++) {
-      const start = seg * (segLen - overlap);
-      if (start + segLen > data.length) break;
-      const re = new Float64Array(N), im = new Float64Array(N);
-      for (let i = 0; i < segLen; i++) re[i] = data[start + i] * win[i];
-      this.fft(re, im);
-      for (let i = 0; i < nFreqs; i++) {
-        let p = (re[i] * re[i] + im[i] * im[i]) / (fs * N * winPow);
-        if (i > 0 && i < N / 2) p *= 2;
-        avgPsd[i] += p * 1e6;
-      }
-      validSegs++;
-    }
-    // Fallback: single FFT if too short for Welch
-    if (validSegs === 0) {
-      const re = new Float64Array(N), im = new Float64Array(N);
-      for (let i = 0; i < Math.min(data.length, segLen); i++) re[i] = data[i] * win[i];
-      this.fft(re, im);
-      for (let i = 0; i < nFreqs; i++) {
-        let p = (re[i] * re[i] + im[i] * im[i]) / (fs * N * winPow);
-        if (i > 0 && i < N / 2) p *= 2;
-        avgPsd[i] = p * 1e6;
-      }
-      validSegs = 1;
-    }
-    for (let i = 0; i < nFreqs; i++) avgPsd[i] /= validSegs;
-
-    let vlf = 0, lf = 0, hf = 0, tp = 0;
-    for (let i = 0; i < nFreqs; i++) {
-      const f = freqs[i];
-      if (f >= 0.003 && f < 0.04) vlf += avgPsd[i] * df;
-      if (f >= 0.04 && f < 0.15) lf += avgPsd[i] * df;
-      if (f >= 0.15 && f <= 0.4) hf += avgPsd[i] * df;
-      if (f >= 0.003 && f <= 0.4) tp += avgPsd[i] * df;
-    }
-    const ratio = hf > 0 ? lf / hf : 0, lfhfSum = lf + hf || 1;
-
-    // Respiratory rate: find peak frequency in HF band (0.15–0.4 Hz)
-    let respFreq = 0, respPeak = 0;
-    for (let i = 0; i < nFreqs; i++) {
-      const f = freqs[i];
-      if (f >= 0.12 && f <= 0.4 && avgPsd[i] > respPeak) {
-        respPeak = avgPsd[i]; respFreq = f;
-      }
-    }
-    const respRate = respFreq > 0 ? Math.round(respFreq * 60 * 10) / 10 : null; // breaths/min
-
-    return {
-      lf: Math.round(lf * 10) / 10, hf: Math.round(hf * 10) / 10, vlf: Math.round(vlf * 10) / 10,
-      tp: Math.round(tp * 10) / 10, ratio: Math.round(ratio * 100) / 100,
-      lfNu: Math.round((lf / lfhfSum) * 100), hfNu: Math.round((hf / lfhfSum) * 100),
-      respRate, respFreq: Math.round(respFreq * 1000) / 1000,
-      psd: avgPsd, freqs, nFreqs
-    };
-  }
-};// ═══════════════════════════════════════════════════════════════
-// DSP ENGINE v5 — Enhanced signal processing pipeline
-//
-// Improvements over v4:
-// 1. Detrending (moving-average baseline removal)
-// 2. Adaptive peak threshold (tracks recent peak amplitudes)
-// 3. Blue-channel motion artifact detection
-// 4. SQI-gated R-R extraction
-// 5. Welch's method for PSD estimation
-// ═══════════════════════════════════════════════════════════════
-
-export const D = {
-
-  // ── Butterworth bandpass ───────────────────────────────────
-  bp2(fs, fl, fh) {
-    const wL = 2 * Math.PI * fl / fs, wH = 2 * Math.PI * fh / fs;
-    const wLw = 2 * fs * Math.tan(wL / 2), wHw = 2 * fs * Math.tan(wH / 2);
-    const bw = wHw - wLw, w0 = Math.sqrt(wLw * wHw), Q = .7071;
-    const K = 2 * fs, K2 = K * K, w02 = w0 * w0, a0 = K2 + bw * K / Q + w02;
-    return { b: [bw * K / a0, 0, -bw * K / a0], a: [1, (2 * w02 - 2 * K2) / a0, (K2 - bw * K / Q + w02) / a0] };
-  },
-  bp4(fs, fl = .5, fh = 4) { return [this.bp2(fs, fl, fh), this.bp2(fs, fl, fh)]; },
-
-  // ── IIR biquad filter ──────────────────────────────────────
-  af(s, c) {
-    const o = new Float64Array(s.length); let z1 = 0, z2 = 0;
-    for (let i = 0; i < s.length; i++) {
-      const x = s[i], y = c.b[0] * x + z1;
-      z1 = c.b[1] * x - c.a[1] * y + z2;
-      z2 = c.b[2] * x - c.a[2] * y;
-      o[i] = y;
-    }
-    return o;
-  },
-
-  // ── Zero-phase filter (filtfilt) ───────────────────────────
-  ff1(s, c) {
-    const p = Math.min(9, s.length - 1), pd = new Float64Array(s.length + 2 * p);
-    for (let i = 0; i < p; i++) { pd[i] = 2 * s[0] - s[p - i]; pd[s.length + p + i] = 2 * s[s.length - 1] - s[s.length - 2 - i]; }
-    for (let i = 0; i < s.length; i++) pd[p + i] = s[i];
-    const f = this.af(pd, c), r = new Float64Array(f.length);
-    for (let i = 0; i < f.length; i++) r[i] = f[f.length - 1 - i];
-    const b = this.af(r, c), o = new Float64Array(s.length);
-    for (let i = 0; i < s.length; i++) o[i] = b[b.length - 1 - p - i];
-    return o;
-  },
-  ff(s, secs) { let o = s; for (const sec of secs) o = this.ff1(o, sec); return o; },
-
-  // ═══ NEW: Detrending — remove slow baseline drift ═════════
-  detrend(s, windowSec, fs) {
-    const w = Math.max(3, Math.round(windowSec * fs)) | 1;
-    const half = (w - 1) / 2;
-    const out = new Float64Array(s.length);
-    for (let i = 0; i < s.length; i++) {
-      const left = Math.max(0, i - half), right = Math.min(s.length - 1, i + half);
-      let sum = 0; for (let j = left; j <= right; j++) sum += s[j];
-      out[i] = s[i] - sum / (right - left + 1);
-    }
-    return out;
-  },
-
-  // ═══ NEW: Blue-channel motion artifact detection ══════════
-  // Returns boolean array: true = clean, false = motion
-  detectMotion(blueChannel, fs, windowSec = 0.5) {
-    const w = Math.max(3, Math.round(windowSec * fs));
-    const n = blueChannel.length;
-    const clean = new Array(n).fill(true);
-    if (n < w * 2) return clean;
-    const vars = [];
-    for (let i = 0; i <= n - w; i++) {
-      let sum = 0, sum2 = 0;
-      for (let j = i; j < i + w; j++) { sum += blueChannel[j]; sum2 += blueChannel[j] * blueChannel[j]; }
-      vars.push(sum2 / w - (sum / w) ** 2);
-    }
-    if (vars.length < 3) return clean;
-    const sv = [...vars].sort((a, b) => a - b);
-    const threshold = sv[0 | sv.length / 2] * 3;
-    for (let i = 0; i < vars.length; i++) {
-      if (vars[i] > threshold) {
-        for (let j = i; j < Math.min(i + w, n); j++) clean[j] = false;
-      }
-    }
-    return clean;
-  },
-
-  // ═══ IMPROVED: Adaptive peak detection ════════════════════
-  rp(d, i) {
-    if (i <= 0 || i >= d.length - 1) return i;
-    const dn = 2 * (2 * d[i] - d[i - 1] - d[i + 1]);
-    return Math.abs(dn) < 1e-10 ? i : i + Math.max(-.5, Math.min(.5, (d[i - 1] - d[i + 1]) / dn));
-  },
-
-  fp(d, md, th = .35) {
-    const pk = []; if (d.length < 5) return pk;
-    const s = [...d].sort((a, b) => a - b);
-    let t = s[0 | s.length * .1] + (s[0 | s.length * .9] - s[0 | s.length * .1]) * th;
-    const recentAmps = [];
-    for (let i = 2; i < d.length - 2; i++) {
-      if (recentAmps.length >= 3) {
-        const avgAmp = recentAmps.reduce((a, b) => a + b, 0) / recentAmps.length;
-        t = avgAmp * 0.4;
-      }
-      if (d[i] > t && d[i] >= d[i - 1] && d[i] >= d[i + 1] && d[i] > d[i - 2] && d[i] > d[i + 2]) {
-        if (!pk.length || i - pk[pk.length - 1] >= md) {
-          pk.push(i);
-          recentAmps.push(d[i]);
-          if (recentAmps.length > 8) recentAmps.shift();
-        } else if (d[i] > d[pk[pk.length - 1]]) {
-          recentAmps[recentAmps.length - 1] = d[i];
-          pk[pk.length - 1] = i;
-        }
-      }
-    }
-    return pk;
-  },
-
-  // ═══ IMPROVED: SQI with per-peak quality flags ════════════
-  sq(f, pk, fs) {
-    if (pk.length < 3) return { score: 0, peakOk: [] };
-    const ib = []; for (let i = 1; i < pk.length; i++) ib.push((pk[i] - pk[i - 1]) / fs * 1e3);
-    const m = ib.reduce((a, b) => a + b, 0) / ib.length;
-    const sd = Math.sqrt(ib.map(x => (x - m) ** 2).reduce((a, b) => a + b, 0) / ib.length);
-    const rs = Math.max(0, Math.min(40, 40 * (1 - sd / m / .5)));
-    const am = pk.map(i => f[i]), mA = am.reduce((a, b) => a + b, 0) / am.length;
-    const sA = Math.sqrt(am.map(x => (x - mA) ** 2).reduce((a, b) => a + b, 0) / am.length);
-    const as = Math.max(0, Math.min(30, 30 * (1 - (mA ? sA / Math.abs(mA) : 1) / .9)));
-    const ab = [...f].map(Math.abs).sort((a, b) => a - b);
-    const n = ab[0 | ab.length * .25], sg = ab[0 | ab.length * .95], snr = n > 0 ? sg / n : sg > 0 ? 15 : 0;
-    const score = Math.round(rs + as + Math.max(0, Math.min(30, 30 * Math.min(1, snr / 4))));
-    // Per-peak quality
-    const medIBI = [...ib].sort((a, b) => a - b)[0 | ib.length / 2];
-    const peakOk = [true];
-    for (let i = 0; i < ib.length; i++) peakOk.push(Math.abs(ib[i] - medIBI) < medIBI * 0.4);
-    return { score, peakOk };
-  },
-
-  // ═══ NEW: SQI-gated R-R extraction ════════════════════════
-  extractRRI(flt, pks, ts, sqiResult, motionClean) {
-    const rri = [];
-    for (let i = 1; i < pks.length; i++) {
-      if (sqiResult?.peakOk && (!sqiResult.peakOk[i - 1] || !sqiResult.peakOk[i])) continue;
-      if (motionClean && (!motionClean[pks[i - 1]] || !motionClean[pks[i]])) continue;
-      const ri0 = this.rp(flt, pks[i - 1]), ri1 = this.rp(flt, pks[i]);
-      const fl0 = Math.floor(ri0), fr0 = ri0 - fl0;
-      const fl1 = Math.floor(ri1), fr1 = ri1 - fl1;
-      const t0 = fl0 >= 0 && fl0 < ts.length - 1 ? ts[fl0] + fr0 * (ts[fl0 + 1] - ts[fl0]) : ts[Math.min(pks[i - 1], ts.length - 1)];
-      const t1 = fl1 >= 0 && fl1 < ts.length - 1 ? ts[fl1] + fr1 * (ts[fl1 + 1] - ts[fl1]) : ts[Math.min(pks[i], ts.length - 1)];
-      const ms = t1 - t0;
-      if (ms > 333 && ms < 1500) rri.push(Math.round(ms * 100) / 100);
-    }
-    return rri;
-  },
-
-  // ── Clean R-R series (shared by hrv + poincaré) ────────────
-  cleanRR(rr) {
-    if (rr.length < 3) return [];
-    let v = rr.filter(r => r > 333 && r < 1500); if (v.length < 3) return [];
-    const s = [...v].sort((a, b) => a - b), md = s[0 | s.length / 2];
-    v = v.filter(r => Math.abs(r - md) < md * .20); if (v.length < 3) return [];
-    const clean = [v[0]];
-    for (let i = 1; i < v.length; i++) {
-      if (Math.abs(v[i] - clean[clean.length - 1]) < clean[clean.length - 1] * 0.25) clean.push(v[i]);
-    }
-    return clean.length >= 3 ? clean : [];
-  },
-
-  // ── Time-domain HRV ────────────────────────────────────────
-  hrv(rr) {
-    const fl = this.cleanRR(rr); if (fl.length < 3) return null;
-    const m = fl.reduce((a, b) => a + b, 0) / fl.length;
-    const sfl = [...fl].sort((a, b) => a - b), medRR = sfl[0 | sfl.length / 2];
-    const sd = Math.sqrt(fl.map(r => (r - m) ** 2).reduce((a, b) => a + b, 0) / fl.length);
-    const df = []; for (let i = 1; i < fl.length; i++) df.push(fl[i] - fl[i - 1]);
-    const rm = Math.sqrt(df.map(d => d * d).reduce((a, b) => a + b, 0) / df.length);
-    const pn = (df.filter(d => Math.abs(d) > 50).length / df.length) * 100;
-    return {
-      bpm: Math.round(6e5 / medRR) / 10, sdnn: Math.round(sd * 10) / 10, rmssd: Math.round(rm * 10) / 10,
-      pnn50: Math.round(pn * 10) / 10, meanRR: Math.round(m * 10) / 10, count: fl.length, rej: rr.length - fl.length
-    };
-  },
-
-  // ── Poincaré SD1/SD2 ───────────────────────────────────────
-  poincare(rr) {
-    const v = this.cleanRR(rr); if (v.length < 4) return null;
-    const d1 = [], d2 = [];
-    for (let i = 0; i < v.length - 1; i++) {
-      d1.push((v[i + 1] - v[i]) / Math.SQRT2);
-      d2.push((v[i + 1] + v[i]) / Math.SQRT2);
-    }
-    const m1 = d1.reduce((a, b) => a + b, 0) / d1.length;
-    const m2 = d2.reduce((a, b) => a + b, 0) / d2.length;
-    const sd1 = Math.sqrt(d1.map(x => (x - m1) ** 2).reduce((a, b) => a + b, 0) / d1.length);
-    const sd2 = Math.sqrt(d2.map(x => (x - m2) ** 2).reduce((a, b) => a + b, 0) / d2.length);
-    const ratio = sd2 > 0 ? sd1 / sd2 : 0;
-    const pairs = [];
-    for (let i = 0; i < v.length - 1; i++) pairs.push([v[i], v[i + 1]]);
-    return { sd1: Math.round(sd1 * 10) / 10, sd2: Math.round(sd2 * 10) / 10, ratio: Math.round(ratio * 100) / 100, pairs };
-  },
-
-  // ── FFT (Radix-2, Cooley-Tukey) ────────────────────────────
-  fft(re, im) {
-    const n = re.length;
-    for (let i = 1, j = 0; i < n; i++) {
-      let bit = n >> 1;
-      while (j & bit) { j ^= bit; bit >>= 1; }
-      j ^= bit;
-      if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
-    }
-    for (let len = 2; len <= n; len <<= 1) {
-      const ang = 2 * Math.PI / len, wRe = Math.cos(ang), wIm = -Math.sin(ang);
-      for (let i = 0; i < n; i += len) {
-        let curRe = 1, curIm = 0;
-        for (let j = 0; j < len / 2; j++) {
-          const uRe = re[i + j], uIm = im[i + j];
-          const vRe = re[i + j + len / 2] * curRe - im[i + j + len / 2] * curIm;
-          const vIm = re[i + j + len / 2] * curIm + im[i + j + len / 2] * curRe;
-          re[i + j] = uRe + vRe; im[i + j] = uIm + vIm;
-          re[i + j + len / 2] = uRe - vRe; im[i + j + len / 2] = uIm - vIm;
-          const nc = curRe * wRe - curIm * wIm; curIm = curRe * wIm + curIm * wRe; curRe = nc;
-        }
-      }
-    }
-  },
-
-  resampleRR(rrMs, targetFs = 4) {
-    if (rrMs.length < 4) return null;
-    const tRR = [0];
-    for (let i = 0; i < rrMs.length; i++) tRR.push(tRR[tRR.length - 1] + rrMs[i] / 1000);
-    const yRR = [rrMs[0] / 1000];
-    for (let i = 0; i < rrMs.length; i++) yRR.push(rrMs[i] / 1000);
-    const duration = tRR[tRR.length - 1], nSamples = Math.floor(duration * targetFs);
-    if (nSamples < 8) return null;
-    const uniform = new Float64Array(nSamples);
-    for (let i = 0; i < nSamples; i++) {
-      const t = i / targetFs;
-      let k = 1; while (k < tRR.length - 1 && tRR[k] < t) k++;
-      k = Math.min(k, tRR.length - 1);
-      const t0 = tRR[k - 1], t1 = tRR[k], frac = (t1 !== t0) ? (t - t0) / (t1 - t0) : 0;
-      uniform[i] = yRR[k - 1] + (yRR[k] - yRR[k - 1]) * frac;
-    }
-    return { data: uniform, fs: targetFs, duration };
-  },
-
-  hann(n) { const w = new Float64Array(n); for (let i = 0; i < n; i++) w[i] = .5 * (1 - Math.cos(2 * Math.PI * i / (n - 1))); return w; },
-
-  // ═══ IMPROVED: Welch's PSD ════════════════════════════════
-  freqHRV(rrMs) {
-    if (rrMs.length < 10) return null;
-    const cleaned = this.cleanRR(rrMs);
-    if (cleaned.length < 10) return null;
-    const resamp = this.resampleRR(cleaned, 4);
-    if (!resamp) return null;
-    const { data, fs } = resamp;
-    const mean = data.reduce((a, b) => a + b, 0) / data.length;
-    for (let i = 0; i < data.length; i++) data[i] -= mean;
-
-    // Welch: segment length (power of 2), 50% overlap
-    let segLen = 1; while (segLen * 2 <= data.length) segLen <<= 1;
-    segLen = Math.max(64, Math.min(segLen, 256));
-    const overlap = segLen / 2;
-    const nSegs = Math.max(1, Math.floor((data.length - overlap) / (segLen - overlap)));
-    const N = Math.max(segLen, 256);
-
-    const win = this.hann(segLen);
-    let winPow = 0; for (let i = 0; i < win.length; i++) winPow += win[i] * win[i];
-    winPow /= win.length;
-
-    const nFreqs = N / 2 + 1;
-    const avgPsd = new Float64Array(nFreqs);
-    const freqs = new Float64Array(nFreqs);
-    const df = fs / N;
-    for (let i = 0; i < nFreqs; i++) freqs[i] = i * df;
-
-    let validSegs = 0;
-    for (let seg = 0; seg < nSegs; seg++) {
-      const start = seg * (segLen - overlap);
-      if (start + segLen > data.length) break;
-      const re = new Float64Array(N), im = new Float64Array(N);
-      for (let i = 0; i < segLen; i++) re[i] = data[start + i] * win[i];
-      this.fft(re, im);
-      for (let i = 0; i < nFreqs; i++) {
-        let p = (re[i] * re[i] + im[i] * im[i]) / (fs * N * winPow);
-        if (i > 0 && i < N / 2) p *= 2;
-        avgPsd[i] += p * 1e6;
-      }
-      validSegs++;
-    }
-    // Fallback: single FFT if too short for Welch
-    if (validSegs === 0) {
-      const re = new Float64Array(N), im = new Float64Array(N);
-      for (let i = 0; i < Math.min(data.length, segLen); i++) re[i] = data[i] * win[i];
-      this.fft(re, im);
-      for (let i = 0; i < nFreqs; i++) {
-        let p = (re[i] * re[i] + im[i] * im[i]) / (fs * N * winPow);
-        if (i > 0 && i < N / 2) p *= 2;
-        avgPsd[i] = p * 1e6;
-      }
-      validSegs = 1;
-    }
-    for (let i = 0; i < nFreqs; i++) avgPsd[i] /= validSegs;
-
-    let vlf = 0, lf = 0, hf = 0, tp = 0;
-    for (let i = 0; i < nFreqs; i++) {
-      const f = freqs[i];
-      if (f >= 0.003 && f < 0.04) vlf += avgPsd[i] * df;
-      if (f >= 0.04 && f < 0.15) lf += avgPsd[i] * df;
-      if (f >= 0.15 && f <= 0.4) hf += avgPsd[i] * df;
-      if (f >= 0.003 && f <= 0.4) tp += avgPsd[i] * df;
-    }
-    const ratio = hf > 0 ? lf / hf : 0, lfhfSum = lf + hf || 1;
-
-    // Respiratory rate: find peak frequency in HF band (0.15–0.4 Hz)
-    let respFreq = 0, respPeak = 0;
-    for (let i = 0; i < nFreqs; i++) {
-      const f = freqs[i];
-      if (f >= 0.12 && f <= 0.4 && avgPsd[i] > respPeak) {
-        respPeak = avgPsd[i]; respFreq = f;
-      }
-    }
-    const respRate = respFreq > 0 ? Math.round(respFreq * 60 * 10) / 10 : null; // breaths/min
-
-    return {
-      lf: Math.round(lf * 10) / 10, hf: Math.round(hf * 10) / 10, vlf: Math.round(vlf * 10) / 10,
-      tp: Math.round(tp * 10) / 10, ratio: Math.round(ratio * 100) / 100,
-      lfNu: Math.round((lf / lfhfSum) * 100), hfNu: Math.round((hf / lfhfSum) * 100),
-      respRate, respFreq: Math.round(respFreq * 1000) / 1000,
-      psd: avgPsd, freqs, nFreqs
-    };
-  }
-};
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
