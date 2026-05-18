@@ -18,6 +18,9 @@ let DUR = 60;
 const SETTLE = 3;
 let smoothedBPM = null;
 const BPM_EMA_ALPHA = 0.25;
+// Diagnostic logging state (parity with Android logs)
+let frameCounter = 0;
+let camRes = '?x?';
 
 // ── Expose to HTML onclick handlers ──────────────────────────
 window.go = go;
@@ -27,6 +30,7 @@ window.runTest = runTest;
 window.runDetTest = runDetTest;
 window.dbClear = dbClear;
 window.exportCSV = exportCSV;
+window.exportRawCSV = exportRawCSV;
 window.setBreathPattern = setBreathPattern;
 window.toggleMeasureBreath = toggleMeasureBreath;
 window.setMeasureBreathPattern = setMeasureBreathPattern;
@@ -40,6 +44,27 @@ function setDuration(sec) {
     const el = document.getElementById(id);
     if (el) el.classList.toggle('active', parseInt(el.dataset.dur) === sec);
   });
+}
+
+// Export raw R,G,B from the last 60 s — for direct comparison with Android logs.
+function exportRawCSV() {
+  if (!raw.length) { alert('Ingen rådata att exportera. Kör en mätning först.'); return; }
+  const cutoff = ts[ts.length - 1] - 60000;
+  let start = 0;
+  while (start < ts.length && ts[start] < cutoff) start++;
+  const t0Ref = ts[start];
+  const lines = ['t_ms,R,G,B'];
+  for (let i = start; i < ts.length; i++) {
+    lines.push(`${Math.round(ts[i] - t0Ref)},${raw[i].toFixed(3)},${rawG[i].toFixed(3)},${rawB[i].toFixed(3)}`);
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `hrv-raw-rgb-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  console.log(`[HRV] exported ${lines.length - 1} raw RGB samples (${camRes} @ ~${fps.toFixed(1)} fps)`);
 }
 
 function handleBreathResult(breathRRI, breathFlt, breathPks, breathSqi, breathStart) {
@@ -67,6 +92,7 @@ async function go() {
   raw = []; rawG = []; rawB = []; ts = []; flt = []; pks = []; rri = [];
   hrv = null; freqResult = null; sqi = 0; sqiHist = []; motionClean = null; sqiResult = null;
   smoothedBPM = null;
+  frameCounter = 0; camRes = '?x?';
 
   if (!navigator.mediaDevices?.getUserMedia) { er.innerHTML = '<b>⚠️</b> Kameran stöds inte.'; er.classList.remove('hide'); b.disabled = false; b.textContent = 'Starta mätning'; return; }
   const cfgs = [{ facingMode: 'environment', width: { ideal: 160 }, height: { ideal: 120 }, frameRate: { ideal: 60, min: 30 } }, { facingMode: 'environment' }, { facingMode: { ideal: 'environment' } }, true];
@@ -79,6 +105,8 @@ async function go() {
   }
   const tk = stm.getVideoTracks()[0], se = tk.getSettings();
   fps = se.frameRate || 30; co = D.bp4(fps, .5, 4);
+  camRes = (se.width || '?') + 'x' + (se.height || '?');
+  console.log(`[HRV] camera started res=${camRes} fps=${fps.toFixed(1)}`);
   try { const cp = tk.getCapabilities?.(); const ad = []; if (cp?.exposureMode) ad.push({ exposureMode: 'manual' }); if (cp?.whiteBalanceMode) ad.push({ whiteBalanceMode: 'manual' }); if (ad.length) try { await tk.applyConstraints({ advanced: ad }); } catch (e) {} } catch (e) {}
   const v = document.getElementById('V'); v.srcObject = stm; await v.play();
 
@@ -116,9 +144,26 @@ function tick() {
   if (!v || !cv || !stm) return;
   const cx = cv.getContext('2d', { willReadFrequently: true }); cv.width = 32; cv.height = 24; cx.drawImage(v, 0, 0, 32, 24);
   const px = cx.getImageData(4, 4, 24, 16).data;
-  let rS = 0, gS = 0, bS = 0, n = 0;
-  for (let i = 0; i < px.length; i += 4) { rS += px[i]; gS += px[i + 1]; bS += px[i + 2]; n++; }
-  const rA = rS / n, gA = gS / n, bA = bS / n, ok = rA > 100 && rA > bA * 1.3 && rA > gA * 1.05;
+  let rS = 0, gS = 0, bS = 0, rSq = 0, gSq = 0, bSq = 0, n = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], g = px[i + 1], b = px[i + 2];
+    rS += r; gS += g; bS += b;
+    rSq += r * r; gSq += g * g; bSq += b * b;
+    n++;
+  }
+  const rA = rS / n, gA = gS / n, bA = bS / n;
+  const rSd = Math.sqrt(Math.max(0, rSq / n - rA * rA));
+  const gSd = Math.sqrt(Math.max(0, gSq / n - gA * gA));
+  const bSd = Math.sqrt(Math.max(0, bSq / n - bA * bA));
+  const ok = rA > 100 && rA > bA * 1.3 && rA > gA * 1.05;
+
+  // Diagnostic log every 30 frames (parity with Android log format)
+  frameCounter++;
+  if (frameCounter % 30 === 0) {
+    console.log(`frame=${frameCounter} res=${camRes} fps=${fps.toFixed(1)} R=${rA.toFixed(1)}±${rSd.toFixed(2)} G=${gA.toFixed(1)}±${gSd.toFixed(2)} B=${bA.toFixed(1)}±${bSd.toFixed(2)}`);
+    if (rA < 30) console.warn(`[HRV] low R mean: R=${rA.toFixed(1)} (frame=${frameCounter})`);
+    if (rSd < 1) console.warn(`[HRV] low R-SD: R-SD=${rSd.toFixed(2)} (frame=${frameCounter})`);
+  }
 
   const fc = document.getElementById('fc'), fd = document.getElementById('fd'), ft = document.getElementById('ft');
   if (ok) { fc.style.cssText = 'display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:7px;font-size:10px;font-weight:600;background:#00f0820d;color:#00f082;border:1px solid #00f0821f'; fd.style.background = '#00f082'; fd.style.boxShadow = '0 0 5px #00f08280'; ft.textContent = 'Finger OK'; }
@@ -302,6 +347,7 @@ function res() {
   <div class="ch"><span class="cl">R-R intervallserie</span><canvas id="RV" height="70"></canvas></div>
   <div class="dg"><div class="dr"><span class="dk">FPS</span><span class="dv">${Math.round(fps * 10) / 10}</span></div><div class="dr"><span class="dk">Filter</span><span class="dv">Butterworth 4:e ordn.</span></div><div class="dr"><span class="dk">Kanaler</span><span class="dv">R 40% + G 60%</span></div><div class="dr"><span class="dk">SQI</span><span class="dv">${sqiF}/100</span></div></div>
   <div class="w">⚠️ Demo — ersätter inte medicinsk utrustning.</div>
+  <button class="bd" onclick="exportRawCSV()" style="margin-bottom:8px">📊 Exportera rå R,G,B (senaste 60 s, CSV)</button>
   <button class="bp" onclick="rst()">Ny mätning</button>`;
 
   requestAnimationFrame(() => {
