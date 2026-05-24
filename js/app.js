@@ -22,6 +22,28 @@ const BPM_EMA_ALPHA = 0.25;
 let frameCounter = 0;
 let camRes = '?x?';
 
+// Wake Lock — håller skärmen vaken under mätning så skärmsläckaren inte
+// kan starta och förstöra pågående 60-sekunders-mätning. Released automatiskt
+// av browsern vid tab-byte; re-acquired via visibilitychange-handler nedan.
+let wakeLock = null;
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+    console.log('[HRV] screen wake lock acquired');
+  } catch (e) {
+    console.warn('[HRV] wake lock failed:', e.message);
+  }
+}
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+}
+// Om användaren växlar tab/app och kommer tillbaka mitt i mätning, återta locket.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && raf !== null) acquireWakeLock();
+});
+
 // ── Expose to HTML onclick handlers ──────────────────────────
 window.go = go;
 window.stop = stop;
@@ -123,11 +145,13 @@ async function go() {
   document.getElementById('TORCH').textContent = torchOk ? 'Lampa: Auto ✓' : 'Lampa: Manuell';
   document.getElementById('TORCH').style.color = torchOk ? '#00f082' : '#ffd60a';
   raf = requestAnimationFrame(tick);
+  acquireWakeLock();
 }
 
 function stop() {
   if (raf) { cancelAnimationFrame(raf); raf = null; }
   if (stm) { stm.getTracks().forEach(t => t.stop()); stm = null; }
+  releaseWakeLock();
   document.getElementById('P1').classList.add('hide');
   if (rri.length >= 10) freqResult = D.freqHRV(rri);
   if (hrv && rri.length >= 10) {
@@ -359,6 +383,7 @@ function res() {
 
 function rst() {
   if (stm) { stm.getTracks().forEach(t => t.stop()); stm = null; }
+  releaseWakeLock();
   document.getElementById('P0').classList.remove('hide');
   document.getElementById('P1').classList.add('hide');
   document.getElementById('P2').classList.add('hide');
