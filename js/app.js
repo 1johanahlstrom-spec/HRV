@@ -151,7 +151,9 @@ async function go() {
 function stop() {
   if (raf) { cancelAnimationFrame(raf); raf = null; }
   if (stm) { stm.getTracks().forEach(t => t.stop()); stm = null; }
-  releaseWakeLock();
+  // Behåll wake lock genom resultat-rendering — om vi släpper här släcks
+  // skärmen ofta innan användaren hinner se BPM/HRV. Locket släpps i rst()
+  // när användaren startar ny mätning eller går tillbaka.
   document.getElementById('P1').classList.add('hide');
   if (rri.length >= 10) freqResult = D.freqHRV(rri);
   if (hrv && rri.length >= 10) {
