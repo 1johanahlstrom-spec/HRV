@@ -21,6 +21,11 @@ const BPM_EMA_ALPHA = 0.25;
 // Diagnostic logging state (parity with Android logs)
 let frameCounter = 0;
 let camRes = '?x?';
+// Live debug panel — reads track.getSettings() at 2 Hz so we can compare
+// what Chromium faktiskt sätter mot Android-pipelinen. Se startDebugPanel().
+let camTrack = null;
+let dbgInterval = null;
+let dbgStartR = null;
 
 // ── Expose to HTML onclick handlers ──────────────────────────
 window.go = go;
@@ -44,6 +49,91 @@ function setDuration(sec) {
     const el = document.getElementById(id);
     if (el) el.classList.toggle('active', parseInt(el.dataset.dur) === sec);
   });
+}
+
+// ── Debug overlay: kamera-state + signal-stats live ───────────
+// Syfte: läsa av exakt vad Chromium sätter på sensorn under mätning
+// (exposureTime, iso, exposureMode, whiteBalanceMode) för att kalibrera
+// Android-pipelinen mot. Webben är referens — den får R=200, ratio_ac_dc=3 %,
+// så vi behöver veta vilken operating point som ger det resultatet.
+// Värdena uppdateras 2 Hz på panelen + loggas till console för persistent record.
+function startDebugPanel(track, caps) {
+  camTrack = track;
+  dbgStartR = null;
+  const panel = document.getElementById('DBG');
+  if (!panel) return;
+  panel.classList.remove('hide');
+
+  // One-shot: vilka kontroller stöder browser/device alls
+  const capLines = [];
+  if (caps?.exposureTime) capLines.push(`expTime: ${caps.exposureTime.min}–${caps.exposureTime.max} (step ${caps.exposureTime.step ?? '?'})  // unit: 100µs typically`);
+  if (caps?.iso) capLines.push(`iso: ${caps.iso.min}–${caps.iso.max} (step ${caps.iso.step ?? '?'})`);
+  if (caps?.exposureMode) capLines.push(`exposureMode: [${caps.exposureMode.join(', ')}]`);
+  if (caps?.whiteBalanceMode) capLines.push(`whiteBalanceMode: [${caps.whiteBalanceMode.join(', ')}]`);
+  if (caps?.focusMode) capLines.push(`focusMode: [${caps.focusMode.join(', ')}]`);
+  if (caps?.torch !== undefined) capLines.push(`torch: ${caps.torch}`);
+  if (caps?.frameRate) capLines.push(`frameRate: ${caps.frameRate.min}–${caps.frameRate.max}`);
+  if (caps?.colorTemperature) capLines.push(`colorTemperature: ${caps.colorTemperature.min}–${caps.colorTemperature.max}`);
+  document.getElementById('DBGCAP').textContent = capLines.length ? capLines.join('\n') : '(inga sensor-kontroller exponerade av browser)';
+  console.log('[HRV-DBG] capabilities:', JSON.parse(JSON.stringify(caps || {})));
+
+  // Live 2 Hz uppdatering
+  if (dbgInterval) clearInterval(dbgInterval);
+  dbgInterval = setInterval(updateDebugPanel, 500);
+}
+
+function updateDebugPanel() {
+  if (!camTrack) return;
+  const s = camTrack.getSettings();
+  const tSec = ((performance.now() - t0) / 1e3).toFixed(1);
+  const rCur = raw.length ? raw[raw.length - 1] : null;
+
+  // Rolling 1 s R-SD
+  let rSdStr = '—';
+  if (raw.length >= 5) {
+    const n = Math.min(raw.length, Math.max(5, Math.round(fps)));
+    const tail = raw.slice(-n);
+    const m = tail.reduce((a, b) => a + b, 0) / n;
+    const v = tail.reduce((a, b) => a + (b - m) * (b - m), 0) / n;
+    rSdStr = Math.sqrt(v).toFixed(2);
+  }
+
+  // DC-drift from start (R₀ = första valid sample efter settling)
+  if (rCur != null && dbgStartR == null) dbgStartR = rCur;
+  const driftStr = (rCur != null && dbgStartR != null) ? (rCur - dbgStartR).toFixed(1) : '—';
+
+  // Format exposureTime — spec säger enhet är 100µs, så värdet 200 = 20 ms
+  const expRaw = s.exposureTime;
+  const expMs = (expRaw != null) ? (expRaw / 10).toFixed(2) + ' ms' : '—';
+
+  document.getElementById('DBGT').textContent = `t = ${tSec} s`;
+  document.getElementById('DBGCAM').innerHTML =
+    `exp:     <b>${expRaw ?? '—'}</b> (${expMs})\n` +
+    `iso:     <b>${s.iso ?? '—'}</b>\n` +
+    `expMode: <b>${s.exposureMode ?? '—'}</b>\n` +
+    `wbMode:  <b>${s.whiteBalanceMode ?? '—'}</b>\n` +
+    `torch:   <b>${s.torch ?? '—'}</b>\n` +
+    `fps:     <b>${s.frameRate != null ? s.frameRate.toFixed(1) : '—'}</b>\n` +
+    `res:     ${s.width || '?'}×${s.height || '?'}`;
+  document.getElementById('DBGSIG').innerHTML =
+    `R-mean:  <b>${rCur != null ? rCur.toFixed(1) : '—'}</b>\n` +
+    `R-SD 1s: <b>${rSdStr}</b>\n` +
+    `R₀:      <b>${dbgStartR != null ? dbgStartR.toFixed(1) : '—'}</b>\n` +
+    `Δ DC:    <b>${driftStr}</b>\n` +
+    `n samp:  ${raw.length}`;
+
+  console.log(
+    `[HRV-DBG t=${tSec}s] exp=${expRaw} (${expMs}) iso=${s.iso} ` +
+    `expMode=${s.exposureMode} wbMode=${s.whiteBalanceMode} torch=${s.torch} ` +
+    `fps=${s.frameRate?.toFixed(1)} | R=${rCur?.toFixed(1)} R-SD=${rSdStr} drift=${driftStr}`
+  );
+}
+
+function stopDebugPanel() {
+  if (dbgInterval) { clearInterval(dbgInterval); dbgInterval = null; }
+  camTrack = null;
+  dbgStartR = null;
+  document.getElementById('DBG')?.classList.add('hide');
 }
 
 // Export raw R,G,B from the last 60 s — for direct comparison with Android logs.
@@ -107,7 +197,10 @@ async function go() {
   fps = se.frameRate || 30; co = D.bp4(fps, .5, 4);
   camRes = (se.width || '?') + 'x' + (se.height || '?');
   console.log(`[HRV] camera started res=${camRes} fps=${fps.toFixed(1)}`);
-  try { const cp = tk.getCapabilities?.(); const ad = []; if (cp?.exposureMode) ad.push({ exposureMode: 'manual' }); if (cp?.whiteBalanceMode) ad.push({ whiteBalanceMode: 'manual' }); if (ad.length) try { await tk.applyConstraints({ advanced: ad }); } catch (e) {} } catch (e) {}
+  console.log('[HRV-DBG] settings BEFORE applyConstraints:', JSON.parse(JSON.stringify(se)));
+  const caps = tk.getCapabilities?.() ?? {};
+  try { const ad = []; if (caps?.exposureMode) ad.push({ exposureMode: 'manual' }); if (caps?.whiteBalanceMode) ad.push({ whiteBalanceMode: 'manual' }); if (ad.length) try { await tk.applyConstraints({ advanced: ad }); } catch (e) {} } catch (e) {}
+  console.log('[HRV-DBG] settings AFTER applyConstraints:', JSON.parse(JSON.stringify(tk.getSettings())));
   const v = document.getElementById('V'); v.srcObject = stm; await v.play();
 
   let torchOk = false;
@@ -122,11 +215,13 @@ async function go() {
   document.getElementById('SETTLE').classList.remove('hide');
   document.getElementById('TORCH').textContent = torchOk ? 'Lampa: Auto ✓' : 'Lampa: Manuell';
   document.getElementById('TORCH').style.color = torchOk ? '#00f082' : '#ffd60a';
+  startDebugPanel(tk, caps);
   raf = requestAnimationFrame(tick);
 }
 
 function stop() {
   if (raf) { cancelAnimationFrame(raf); raf = null; }
+  stopDebugPanel();
   if (stm) { stm.getTracks().forEach(t => t.stop()); stm = null; }
   document.getElementById('P1').classList.add('hide');
   if (rri.length >= 10) freqResult = D.freqHRV(rri);
