@@ -75,7 +75,10 @@ function exportRawCSV() {
   let start = 0;
   while (start < ts.length && ts[start] < cutoff) start++;
   const t0Ref = ts[start];
-  const lines = ['t_ms,R,G,B'];
+  const meta = hrv
+    ? `# bpm=${hrv.bpm} rmssd=${hrv.rmssd} sdnn=${hrv.sdnn} pnn50=${hrv.pnn50} meanRR=${hrv.meanRR} n_valid=${hrv.count} n_rej=${hrv.rej} sqi=${Math.round(sqi)}`
+    : `# (no hrv result available — measurement not finished?)`;
+  const lines = [meta, 't_ms,R,G,B'];
   for (let i = start; i < ts.length; i++) {
     lines.push(`${Math.round(ts[i] - t0Ref)},${raw[i].toFixed(3)},${rawG[i].toFixed(3)},${rawB[i].toFixed(3)}`);
   }
