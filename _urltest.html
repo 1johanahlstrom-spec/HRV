@@ -1,0 +1,35 @@
+<!DOCTYPE html><html lang="sv"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>URL-längd-probe</title>
+<style>
+  body{background:#08090C;color:#0f0;font:14px monospace;padding:14px;margin:0}
+  a.probe{display:block;margin:10px 0;padding:18px;background:#00F082;color:#000;
+    font-size:18px;font-weight:bold;text-align:center;text-decoration:none;border-radius:12px}
+  #log{color:#8f8;font-size:12px;white-space:pre-wrap;margin-top:14px}
+</style></head>
+<body>
+<div>DE-RISK: dispatchar Chrome en STOR custom-scheme-URL intakt?<br>
+Tappa varje storlek → native RawProbe loggar mottagen d-längd.</div>
+<div id="links"></div>
+<div id="log"></div>
+<script>
+// Bygg tap-länkar för flera payload-storlekar. Innehållet är irrelevant för längd-testet
+// — vi mäter bara om Chrome bär hela d-parametern fram till native (hrvrawprobe://).
+// Storlekar speglar faktisk gzip+base64-payload: 17KB(60s) 33KB(60s+t) 60KB(2min) 150KB(5min).
+const SIZES = [10000, 17000, 33000, 60000, 150000];
+const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'; // base64url-set
+function mkPayload(n){ let s=''; while(s.length<n) s+=CHARS; return s.slice(0,n); }
+const links = document.getElementById('links');
+for (const n of SIZES) {
+  const d = mkPayload(n);
+  const a = document.createElement('a');
+  a.className = 'probe';
+  a.href = 'hrvrawprobe://probe?n=' + n + '&d=' + d;
+  a.textContent = 'Skicka ' + (n/1000).toFixed(0) + ' KB  →';
+  links.appendChild(a);
+}
+document.getElementById('log').textContent =
+  'Sidan byggde ' + SIZES.length + ' länkar (' + SIZES.map(n=>(n/1000)+'KB').join(', ') + ').\n' +
+  'Förväntat: native loggar received_d_len == n (INTAKT=true) om Chrome bär hela URL:en.';
+</script>
+</body></html>
